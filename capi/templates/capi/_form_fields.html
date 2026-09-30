@@ -1,0 +1,9 @@
+{% for f in form %}
+<div class="form-row" style="margin-bottom:12px">
+  {% if f.field.widget.input_type == 'checkbox' %}
+  <label>{{ f }} {{ f.label }}</label>
+  {% else %}<label class="field-label">{{ f.label }}</label>{{ f }}{% endif %}
+  {% if f.help_text %}<div class="capi-muted">{{ f.help_text }}</div>{% endif %}
+  {% for e in f.errors %}<div style="color:#b91c1c;font-size:13px">{{ e }}</div>{% endfor %}
+</div>{% endfor %}
+{% for e in form.non_field_errors %}<div style="color:#b91c1c">{{ e }}</div>{% endfor %}

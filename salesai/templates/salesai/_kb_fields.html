@@ -1,0 +1,28 @@
+<div class="form-row">
+ <div class="form-group"><label class="field-label">Name *</label><input class="form-control" name="name" value="{{ s.name|default:'' }}"></div>
+ <div class="form-group"><label class="field-label">Type</label><select class="form-control" name="kind">
+   {% for v,l in kinds %}<option value="{{ v }}" {% if s and s.kind == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+ <div class="form-group"><label class="field-label">Delivery effort</label><select class="form-control" name="effort">
+   {% for v,l in efforts %}<option value="{{ v }}" {% if s and s.effort == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+</div>
+<div class="form-row">
+ <div class="form-group"><label class="field-label">Matching keywords (needs / problems it solves)</label><textarea class="form-control" rows="3" name="keywords">{{ s.keywords|default:'' }}</textarea></div>
+ <div class="form-group"><label class="field-label">Do NOT match when need contains</label><textarea class="form-control" rows="3" name="exclude_keywords">{{ s.exclude_keywords|default:'' }}</textarea></div>
+ <div class="form-group"><label class="field-label">Industries (empty = any)</label><textarea class="form-control" rows="3" name="industries">{{ s.industries|default:'' }}</textarea></div>
+</div>
+<div class="form-group"><label class="field-label">Approved summary *</label><textarea class="form-control" rows="2" name="description">{{ s.description|default:'' }}</textarea></div>
+<div class="form-row">
+ <div class="form-group"><label class="field-label">Approved features (one per line)</label><textarea class="form-control" rows="3" name="features">{{ s.features|default:'' }}</textarea></div>
+ <div class="form-group"><label class="field-label">Approved pricing statement</label><textarea class="form-control" rows="3" name="pricing_note">{{ s.pricing_note|default:'' }}</textarea></div>
+</div>
+<div class="form-row">
+ <div class="form-group"><label class="field-label">Approved delivery timeline statement</label><textarea class="form-control" rows="2" name="timeline_note">{{ s.timeline_note|default:'' }}</textarea></div>
+ <div class="form-group"><label class="field-label">Approved guarantees / SLA statement</label><textarea class="form-control" rows="2" name="guarantees_note">{{ s.guarantees_note|default:'' }}</textarea></div>
+</div>
+<div class="form-row">
+ <div class="form-group"><label class="field-label">Approved case examples / material to send</label><textarea class="form-control" rows="2" name="case_examples">{{ s.case_examples|default:'' }}</textarea></div>
+ <div class="form-group"><label class="field-label">Known objections (one per line)</label><textarea class="form-control" rows="2" name="common_objections">{{ s.common_objections|default:'' }}</textarea></div>
+ <div class="form-group"><label class="field-label">Discovery questions (one per line)</label><textarea class="form-control" rows="2" name="discovery_questions">{{ s.discovery_questions|default:'' }}</textarea></div>
+</div>
+<p><label><input type="checkbox" name="demo_available" {% if s and s.demo_available %}checked{% endif %}> A standard demo exists</label>
+   &nbsp; <label><input type="checkbox" name="active" {% if not s or s.active %}checked{% endif %}> Active</label></p>

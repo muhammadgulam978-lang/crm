@@ -1,0 +1,44 @@
+{% extends 'leads/base.html' %}
+{% block title %}Product knowledge base - Raabta 360{% endblock %}
+{% block content %}
+<h1 class="page-title">Product / Solution Knowledge Base</h1>
+{% include 'salesai/_nav.html' %}
+<div class="sa-warn"><b>How this works.</b> The assistant may recommend only <b>approved</b> entries, and it may show only the text written here.
+If a feature, price, guarantee or timeline is empty, it says "not in the knowledge base" - it never fills the gap.
+Any edit sends the entry back to <b>draft</b> until a manager approves it again. Approved entries: <b>{{ approved_count }}</b>.</div>
+
+{% for s in items %}
+<div class="card" style="border-left:4px solid {% if s.status == 'approved' %}#2e7d32{% else %}#e08a00{% endif %};">
+ <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+  <h3 class="section-heading" style="margin:0;">{{ s.name }} <span class="row-subtext">({{ s.get_kind_display }})</span>
+    {% if s.status == 'approved' %}<span class="sa-tag sa-v">approved</span>{% else %}<span class="sa-tag sa-a">draft</span>{% endif %}
+    {% if not s.active %}<span class="sa-tag sa-u">inactive</span>{% endif %}</h3>
+  {% if s.status == 'approved' %}<span class="row-subtext">approved by {{ s.approved_by.username|default:"-" }} on {{ s.approved_at|date:"d M Y" }}</span>{% endif %}
+ </div>
+ {% if can_edit %}
+ <details style="margin-top:10px;"><summary>Edit</summary>
+ <form method="post" action="{% url 'salesai:service_save' %}">{% csrf_token %}<input type="hidden" name="id" value="{{ s.pk }}">
+  {% include 'salesai/_kb_fields.html' with s=s %}
+  <button class="btn btn-small">Save (returns to draft)</button>
+ </form></details>
+ <div style="display:flex;gap:8px;margin-top:8px;">
+  {% if s.status == 'approved' %}
+  <form method="post" action="{% url 'salesai:service_approve' s.pk %}">{% csrf_token %}<input type="hidden" name="action" value="unapprove"><button class="btn btn-small">Move to draft</button></form>
+  {% else %}
+  <form method="post" action="{% url 'salesai:service_approve' s.pk %}">{% csrf_token %}<button class="btn btn-small">Approve for use</button></form>
+  {% endif %}
+  <form method="post" action="{% url 'salesai:service_delete' s.pk %}">{% csrf_token %}<button class="btn btn-small" onclick="return confirm('Delete {{ s.name|escapejs }}?')">Delete</button></form>
+ </div>
+ {% else %}
+ <p>{{ s.description|default:"(no approved summary)" }}</p>
+ {% endif %}
+</div>
+{% empty %}<div class="card"><p class="empty-state">No entries yet. Add EduPilot, SIS AI CRM, AI BDO / Automation, Custom Software Development ... below (or run <code>python manage.py salesai_seed_kb</code>).</p></div>{% endfor %}
+
+{% if can_edit %}
+<div class="card"><h3 class="section-heading">Add an offer</h3>
+<form method="post" action="{% url 'salesai:service_save' %}">{% csrf_token %}
+ {% include 'salesai/_kb_fields.html' with s=None %}
+ <button class="btn">Add as draft</button></form></div>
+{% endif %}
+{% endblock %}

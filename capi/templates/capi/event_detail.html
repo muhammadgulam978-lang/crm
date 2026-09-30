@@ -1,0 +1,33 @@
+{% extends 'leads/base.html' %}
+{% block title %}Conversion event{% endblock %}
+{% block content %}
+<div class="list-header"><h2 class="page-title">{{ ev.event_name }} → {{ ev.get_platform_display }}</h2>
+  <div>
+  {% if ev.status != 'sent' and ev.status != 'processing' %}
+  <form method="post" action="{% url 'capi:event_action' ev.pk 'retry' %}" class="capi-inline">{% csrf_token %}<button class="btn btn-small">Retry now</button></form>
+  {% if ev.status != 'cancelled' %}<form method="post" action="{% url 'capi:event_action' ev.pk 'cancel' %}" class="capi-inline">{% csrf_token %}<button class="btn btn-small" style="background:#64748b">Cancel</button></form>{% endif %}
+  {% endif %}</div></div>
+{% include 'capi/_nav.html' with nav='' %}
+<div class="capi-grid">
+  <div class="card"><h3 style="margin-top:0">Event</h3>
+    <p>Status: {% include 'capi/_status.html' with s=ev.status %} · attempts {{ ev.attempts }}</p>
+    <p>Lead: {% if ev.lead %}<a href="{% url 'lead_detail' ev.lead.pk %}">{{ ev.lead_label }}</a> · <a href="{% url 'capi:lead_tracking' ev.lead.pk %}">attribution &amp; consent</a>{% else %}{{ ev.lead_label }} (deleted){% endif %}</p>
+    <p>Trigger: {{ ev.trigger_key }} ({{ ev.source_model }} #{{ ev.source_id }})</p>
+    <p>Event time: {{ ev.event_time|date:"d M Y H:i:s" }} UTC · Value: {{ ev.value|default:"—" }} {{ ev.currency }}</p>
+    <p>CRM event ID: <span class="capi-mono">{{ ev.event_id }}</span></p></div>
+  <div class="card"><h3 style="margin-top:0">Attribution</h3>
+    <p>Campaign: {{ ev.campaign_name|default:"—" }} <span class="capi-muted">{{ ev.campaign_id }}</span></p>
+    <p>Ad set: {{ ev.adset_id|default:"—" }} · Ad: {{ ev.ad_id|default:"—" }}</p></div>
+  <div class="card"><h3 style="margin-top:0">Response / match status</h3>
+    <p>HTTP: {{ ev.response_status|default:"—" }} · Events received: {{ ev.events_received|default:"—" }}</p>
+    <p>Identifiers supplied: <span class="capi-mono">{{ ev.identifiers_used|join:", "|default:"—" }}</span></p>
+    <p>Trace ID: <span class="capi-mono">{{ ev.platform_trace_id|default:"—" }}</span></p>
+    {% if ev.error_message %}<p style="color:#b91c1c"><strong>{{ ev.error_code }}</strong> {{ ev.error_message }}</p>{% endif %}</div>
+</div>
+{% if ev.request_payload %}<h3>Payload sent (identifiers hashed)</h3><pre class="capi-pre">{{ ev.request_payload|pprint }}</pre>{% endif %}
+{% if ev.response_body %}<h3>Platform response</h3><pre class="capi-pre">{{ ev.response_body }}</pre>{% endif %}
+<h3>Attempts</h3>
+<div class="table-card"><table class="items-table"><thead><tr><th>#</th><th>When</th><th>Result</th><th>HTTP</th><th>ms</th><th>Message</th></tr></thead><tbody>
+{% for l in logs %}<tr><td>{{ l.attempt }}</td><td>{{ l.created_at|date:"d M H:i:s" }}</td><td>{% if l.success %}<span class="badge badge-green">ok</span>{% else %}<span class="badge badge-red">fail</span>{% endif %}</td><td>{{ l.status_code|default:"—" }}</td><td>{{ l.duration_ms|default:"—" }}</td><td>{{ l.message|truncatechars:120 }}</td></tr>
+{% empty %}<tr><td colspan="6" class="capi-muted">No attempts yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

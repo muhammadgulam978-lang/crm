@@ -1,0 +1,15 @@
+{% extends 'leads/base.html' %}
+{% block title %}CAPI logs{% endblock %}
+{% block content %}
+<div class="list-header"><h2 class="page-title">Event Logs</h2>
+  <div class="filters"><a href="?">All</a> <a href="?ok=1">Success</a> <a href="?ok=0">Failures</a></div></div>
+{% include 'capi/_nav.html' with nav='logs' %}
+<div class="table-card"><table class="items-table"><thead><tr><th>When</th><th>Event</th><th>Attempt</th><th>Result</th><th>HTTP</th><th>ms</th><th>Message</th></tr></thead><tbody>
+{% for l in page_obj %}<tr><td>{{ l.created_at|date:"d M H:i:s" }}</td><td><a href="{% url 'capi:event_detail' l.event_id %}">{{ l.event.event_name }} · {{ l.event.lead_label }}</a></td><td>{{ l.attempt }}</td>
+<td>{% if l.success %}<span class="badge badge-green">ok</span>{% else %}<span class="badge badge-red">fail</span>{% endif %}</td><td>{{ l.status_code|default:"—" }}</td><td>{{ l.duration_ms|default:"—" }}</td><td>{{ l.message|truncatechars:100 }}</td></tr>
+{% empty %}<tr><td colspan="7" class="capi-muted" style="text-align:center">No logs.</td></tr>{% endfor %}</tbody></table></div>
+{% if page_obj.has_other_pages %}<div class="pagination">
+  {% if page_obj.has_previous %}<a href="?ok={{ ok }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+  <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}<a href="?ok={{ ok }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}</div>{% endif %}
+{% endblock %}

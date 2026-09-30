@@ -1,0 +1,25 @@
+{% extends 'leads/base.html' %}
+{% block title %}AI overrides - Raabta 360{% endblock %}
+{% block content %}
+<h1 class="page-title">When salespeople changed the AI recommendation</h1>
+{% include 'salesai/_nav.html' %}
+<div class="kpi-grid">
+ <div class="kpi-card green"><div class="kpi-body"><div class="kpi-value">{{ stats.accepted }}</div><div class="kpi-label">Accepted as recommended</div></div></div>
+ <div class="kpi-card orange"><div class="kpi-body"><div class="kpi-value">{{ stats.edited }}</div><div class="kpi-label">Changed by salesperson</div></div></div>
+ <div class="kpi-card"><div class="kpi-body"><div class="kpi-value">{{ stats.human }}</div><div class="kpi-label">Set without a recommendation</div></div></div>
+</div>
+<div class="card" style="margin-top:16px;">
+<form method="get" class="search-bar"><select name="kind" class="form-control" style="max-width:260px;"><option value="">All</option>
+ {% for v,l in kinds %}<option value="{{ v }}" {% if f.kind == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select><button class="btn btn-small">Filter</button></form>
+<div class="table-scroll"><table><thead><tr><th>When</th><th>Lead</th><th>By</th><th>Type</th><th>AI recommended</th><th>Salesperson chose</th><th>Changed</th><th>Reason</th></tr></thead><tbody>
+{% for o in page %}<tr><td>{{ o.created_at|date:"d M Y H:i" }}</td><td>{% if o.lead %}<a href="{% url 'salesai:workspace' o.lead_id %}">{{ o.lead.name }}</a>{% endif %}</td>
+ <td>{{ o.user.username|default:"-" }}</td><td>{{ o.get_kind_display }}</td>
+ <td>{{ o.ai_value.action|default:o.ai_value.level|default:"-" }}{% if o.ai_value.due_date %}<div class="sa-ev">due {{ o.ai_value.due_date }}</div>{% endif %}</td>
+ <td>{{ o.chosen_value.action|default:o.chosen_value.level|default:"-" }}{% if o.chosen_value.due_date %}<div class="sa-ev">due {{ o.chosen_value.due_date }}</div>{% endif %}</td>
+ <td>{{ o.changed_fields|join:", " }}</td><td>{{ o.reason|default:"-" }}</td></tr>
+{% empty %}<tr><td colspan="8" class="empty-state">No overrides recorded.</td></tr>{% endfor %}</tbody></table></div>
+{% if page.has_previous %}<a class="btn btn-small" href="?page={{ page.previous_page_number }}&kind={{ f.kind }}">Prev</a>{% endif %}
+Page {{ page.number }} / {{ page.paginator.num_pages }}
+{% if page.has_next %}<a class="btn btn-small" href="?page={{ page.next_page_number }}&kind={{ f.kind }}">Next</a>{% endif %}
+</div>
+{% endblock %}

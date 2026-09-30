@@ -1,0 +1,1 @@
+<span class="badge {% if s == 'sent' or s == 'ok' %}badge-green{% elif s == 'failed' or s == 'error' or s == 'rejected' or s == 'expired' or s == 'missing' %}badge-red{% elif s == 'retrying' or s == 'pending' or s == 'expiring' or s == 'unknown' %}badge-orange{% elif s == 'processing' %}badge-blue{% else %}badge-purple{% endif %}">{{ s }}</span>

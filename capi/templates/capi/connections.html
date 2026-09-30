@@ -1,0 +1,21 @@
+{% extends 'leads/base.html' %}
+{% block title %}CAPI connections{% endblock %}
+{% block content %}
+<div class="list-header"><h2 class="page-title">Platform Connections</h2></div>
+{% include 'capi/_nav.html' with nav='connections' %}
+<div class="capi-grid">
+{% for conn, form, label in forms %}
+  <div class="form-card"><div class="form-card-header"><h2>{{ label }}</h2></div>
+    <div class="form-card-body" style="padding:20px 28px">
+      <p>Health: {% include 'capi/_status.html' with s=conn.health_status %} &nbsp;Token: {% include 'capi/_status.html' with s=conn.token_status %}
+        {% if conn.token_hint %}<span class="capi-muted">(ends …{{ conn.token_hint }})</span>{% endif %}</p>
+      {% if conn.health_message %}<p class="capi-muted">{{ conn.health_message }}</p>{% endif %}
+      <form method="post">{% csrf_token %}<input type="hidden" name="platform" value="{{ conn.platform }}">
+        {% include 'capi/_form_fields.html' %}
+        <div class="form-actions"><button class="btn">Save</button></div></form>
+      <form method="post" action="{% url 'capi:connection_test' conn.platform %}" style="margin-top:10px">{% csrf_token %}
+        <button class="btn btn-small" style="background:#64748b">Test connection</button></form>
+    </div></div>
+{% endfor %}
+</div>
+{% endblock %}

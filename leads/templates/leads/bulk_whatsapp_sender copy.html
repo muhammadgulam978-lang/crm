@@ -1,0 +1,57 @@
+{% extends 'leads/base.html' %}
+{% block title %}Bulk WhatsApp Sender - Lead CRM{% endblock %}
+{% block content %}
+<h1 class="page-title">Bulk WhatsApp Sender</h1>
+
+<div class="card">
+    <h2 class="section-heading">Upload Excel File</h2>
+    <p style="color:var(--text-muted); margin-bottom:20px;">
+        Upload an Excel file (.xlsx) with at least two columns:
+        <code>name</code> (or <code>full_name</code>) and
+        <code>phone</code> (or <code>contact_number</code>).
+    </p>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group" style="margin-bottom:15px;">
+            <label class="field-label">Excel File (.xlsx)</label>
+            <input type="file" name="file" accept=".xlsx,.xls"
+                   class="form-control" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom:15px;">
+            <label class="field-label">Follow-up Message (optional)</label>
+            <textarea name="message" rows="6" class="form-control"
+                      style="width:100%; padding:8px;"
+                      placeholder="Leave blank to send the default welcome message. Use {name} to insert each lead's name, e.g. 'Assalam o Alaikum {name}, following up on your study abroad inquiry...'"></textarea>
+            <p style="font-size:13px; color:var(--text-muted); margin-top:6px;">
+                Agar ye field khali chhod di to sirf welcome message jayega.
+                Follow-up message bhejna hai to yahan likhein — <code>{name}</code>
+                automatically har lead ke naam se replace ho jayega.
+            </p>
+        </div>
+
+        <button type="submit" class="btn">&#128172; Send Messages</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2 class="section-heading">Expected File Format</h2>
+    <table>
+        <thead>
+            <tr><th>name</th><th>phone</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Ahmed Khan</td><td>+923001234567</td></tr>
+            <tr><td>Sara Ali</td><td>03007654321</td></tr>
+            <tr><td>John Smith</td><td>+447911123456</td></tr>
+        </tbody>
+    </table>
+    <p style="font-size:13px; color:var(--text-muted); margin-top:12px;">
+        Phone numbers can be in any format — local (03001234567),
+        international (+923001234567), or with country code (923001234567).
+        They will be converted automatically. Rows with no name or no phone
+        are skipped.
+    </p>
+</div>
+{% endblock %}

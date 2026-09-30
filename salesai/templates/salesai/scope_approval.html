@@ -1,0 +1,65 @@
+{% extends 'leads/base.html' %}
+{% block title %}Scope approval - {{ lead.name }}{% endblock %}
+{% block content %}
+<h1 class="page-title">Scope + Commercial Approval: {{ lead.name }}</h1>
+{% include 'salesai/_nav.html' %}
+<p><a href="{% url 'salesai:workspace' lead.pk %}">&larr; Workspace</a></p>
+<div class="sa-warn"><b>Feature 1 gate.</b> Sales AND Delivery must approve all six items below before any
+proposal, quotation or SOW leaves the building. The AI drafted this snapshot - a human approves it.</div>
+
+<div class="kpi-grid">
+ <div class="kpi-card {% if approval.sales_approved_at %}green{% else %}orange{% endif %}"><div class="kpi-body">
+   <div class="kpi-value">{{ approval.get_status_display }}</div>
+   <div class="kpi-label">Sales: {% if approval.sales_approved_by %}{{ approval.sales_approved_by.username }} {{ approval.sales_approved_at|date:"d M H:i" }}{% else %}pending{% endif %}</div>
+   <div class="kpi-label">Delivery: {% if approval.delivery_approved_by %}{{ approval.delivery_approved_by.username }} {{ approval.delivery_approved_at|date:"d M H:i" }}{% else %}pending{% endif %}</div>
+ </div></div>
+</div>
+
+<div class="card"><h3 class="section-heading">1. Scope</h3>
+ <b>In scope</b>{% for x in approval.scope.in_scope %}<div class="sa-box">{{ x }}</div>{% empty %}<div class="row-subtext">(none listed)</div>{% endfor %}
+ <b>Out of scope</b>{% for x in approval.scope.out_of_scope %}<div class="sa-box">{{ x }}</div>{% empty %}<div class="row-subtext">(none listed)</div>{% endfor %}
+</div>
+
+<div class="card"><h3 class="section-heading">2. Features</h3>
+{% for f in approval.features %}<div class="sa-box">{{ f }}</div>{% empty %}<div class="row-subtext">(no approved features)</div>{% endfor %}</div>
+
+<div class="card"><h3 class="section-heading">3. Timeline</h3>
+ <div class="row-subtext">Customer target: {{ approval.timeline.customer_target|default:"not verified" }}</div>
+ <div class="row-subtext">Approved statement: {{ approval.timeline.statement|default:"not in the knowledge base" }}</div>
+</div>
+
+<div class="card"><h3 class="section-heading">4. Price</h3>
+ <div class="row-subtext">Approved statement: {{ approval.price.statement|default:"not in the knowledge base" }}</div>
+</div>
+
+<div class="card"><h3 class="section-heading">5. Assumptions</h3>
+{% for a in approval.assumptions %}<div class="sa-box">{{ a }}</div>{% empty %}<div class="row-subtext">(none)</div>{% endfor %}</div>
+
+<div class="card"><h3 class="section-heading">6. Dependencies &amp; exclusions</h3>
+{% for d in approval.dependencies %}<div class="sa-box">{{ d }}</div>{% endfor %}
+{% for e in approval.exclusions %}<div class="sa-box">{{ e }}</div>{% endfor %}
+{% if not approval.dependencies and not approval.exclusions %}<div class="row-subtext">(none)</div>{% endif %}</div>
+
+{% if approval.status == 'pending_sales' and can_sales %}
+<div class="card"><h3 class="section-heading">Sales approval</h3>
+<form method="post" action="{% url 'salesai:scope_approval_sales' approval.pk %}">{% csrf_token %}
+ <textarea name="notes" class="form-control" rows="2" placeholder="Notes (optional)"></textarea>
+ <button class="btn">Approve as Sales</button></form>
+<form method="post" action="{% url 'salesai:scope_approval_reject' approval.pk %}" style="margin-top:6px;">{% csrf_token %}
+ <input name="reason" class="form-control" placeholder="Rejection reason *" required><button class="btn btn-small">Reject</button></form>
+</div>
+{% elif approval.status == 'pending_delivery' and can_delivery %}
+<div class="card"><h3 class="section-heading">Delivery approval</h3>
+<form method="post" action="{% url 'salesai:scope_approval_delivery' approval.pk %}">{% csrf_token %}
+ <textarea name="notes" class="form-control" rows="2" placeholder="Notes (optional)"></textarea>
+ <button class="btn">Approve as Delivery</button></form>
+<form method="post" action="{% url 'salesai:scope_approval_reject' approval.pk %}" style="margin-top:6px;">{% csrf_token %}
+ <input name="reason" class="form-control" placeholder="Rejection reason *" required><button class="btn btn-small">Reject</button></form>
+</div>
+{% elif approval.status == 'approved' %}
+<div class="sa-box" style="border-color:#2e7d32;">Approved by both Sales and Delivery on {{ approval.delivery_approved_at|date:"d M Y H:i" }}.
+ <a href="{% url 'salesai:proposal_review' approval.proposal_draft_id %}">Back to the proposal</a>.</div>
+{% elif approval.status == 'rejected' %}
+<div class="sa-warn">Rejected by {{ approval.delivery_approved_by|default:approval.sales_approved_by|default:"-" }}: {{ approval.rejection_reason }}</div>
+{% endif %}
+{% endblock %}

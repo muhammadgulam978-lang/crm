@@ -1,0 +1,11 @@
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;">
+  <a class="btn btn-small" href="{% url 'salesai:dashboard' %}">Overview</a>
+  <a class="btn btn-small" href="{% url 'salesai:next_actions' %}?scope=mine">Next actions</a>
+  <a class="btn btn-small" href="{% url 'salesai:understanding' %}">Customer understanding</a>
+  <a class="btn btn-small" href="{% url 'salesai:kb' %}">Product knowledge base</a>
+  {% if request.user.is_superuser or request.user.profile.role == 'admin' or request.user.profile.role == 'sales_manager' or request.user.profile.role == 'ceo' %}
+  <a class="btn btn-small" href="{% url 'salesai:overrides' %}">AI overrides</a>
+  <a class="btn btn-small" href="{% url 'salesai:settings' %}">Settings</a>
+  {% endif %}
+</div>
+{% include 'salesai/_styles.html' %}

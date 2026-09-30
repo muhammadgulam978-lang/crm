@@ -1,0 +1,48 @@
+{% extends 'leads/base.html' %}
+{% block title %}Call brief - {{ lead.name }}{% endblock %}
+{% block content %}
+<h1 class="page-title">Call brief: {{ lead.name }}</h1>
+{% include 'salesai/_nav.html' %}
+<p><a href="{% url 'salesai:workspace' lead.pk %}">&larr; Workspace</a></p>
+<form method="post" style="margin-bottom:12px;">{% csrf_token %}<button class="btn">{% if brief %}Prepare a fresh brief{% else %}Prepare call brief{% endif %}</button></form>
+{% if not brief %}<p class="empty-state">No brief yet.</p>{% else %}
+<div class="sa-warn">Prepared {{ brief.generated_at|date:"d M Y H:i" }}. It contains only what is recorded in the CRM and the approved knowledge base. Review it before you contact the customer.
+ {% if brief.reviewed_at %}<br><b>Reviewed by {{ brief.reviewed_by.username }}</b> on {{ brief.reviewed_at|date:"d M H:i" }}.{% else %}
+ <form method="post" action="{% url 'salesai:brief_reviewed' brief.pk %}" style="margin-top:6px;">{% csrf_token %}<button class="btn btn-small">I have reviewed this brief</button></form>{% endif %}</div>
+{% for w in c.warnings %}<div class="sa-warn">{{ w }}</div>{% endfor %}
+<div class="sa-grid">
+<div class="card"><h3 class="section-heading">Customer / company</h3>
+ <div>{{ c.customer.lead }}{% if c.customer.company %} - {{ c.customer.company }}{% endif %}</div>
+ <div class="row-subtext">Contact: {{ c.customer.contact|default:"-" }} &middot; {{ c.customer.country|default:"-" }} &middot; {{ c.customer.source }} &middot; {{ c.customer.stage }}</div>
+ <h3 class="section-heading" style="margin-top:14px;">Stated need</h3>
+ {% for f in c.stated_need.verified %}<div class="sa-box"><span class="sa-tag sa-v">verified</span> {{ f.text }}<div class="sa-ev">{{ f.source }}</div></div>{% endfor %}
+ {% for f in c.stated_need.assumed %}<div class="sa-box"><span class="sa-tag sa-a">assumption</span> {{ f.text }}<div class="sa-ev">{{ f.source }}</div></div>{% endfor %}
+ {% if not c.stated_need.verified and not c.stated_need.assumed %}<p class="row-subtext">No need recorded.</p>{% endif %}
+ <h3 class="section-heading" style="margin-top:14px;">Recommended offer</h3>
+ <div><b>{{ c.recommended_offer.label|default:"None yet" }}</b></div>{% for w in c.recommended_offer.why %}<div class="row-subtext">{{ w }}</div>{% endfor %}
+ <h3 class="section-heading" style="margin-top:14px;">Known requirements</h3>
+ {% for f in c.known_requirements %}<div class="sa-box"><span class="sa-tag sa-v">verified</span> {{ f.text }}</div>{% endfor %}
+ {% for f in c.assumed_requirements %}<div class="sa-box"><span class="sa-tag sa-a">assumption</span> {{ f.text }}</div>{% endfor %}
+</div>
+<div class="card"><h3 class="section-heading">Relevant SIS solution (approved knowledge base)</h3>
+ {% for s in c.relevant_solutions %}<div class="sa-box"><b>{{ s.label }}</b>
+  <div>{{ s.description|default:"Summary not in the knowledge base." }}</div>
+  {% if s.features %}<ul style="margin-left:18px;">{% for x in s.features %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class="row-subtext">Features: not in the knowledge base.</div>{% endif %}
+  <div class="row-subtext">Pricing: {{ s.pricing_note|default:"not in the knowledge base - do not quote" }}</div>
+  <div class="row-subtext">Timeline: {{ s.timeline_note|default:"not in the knowledge base - do not promise" }}</div>
+  <div class="row-subtext">Guarantees: {{ s.guarantees_note|default:"not in the knowledge base - do not promise" }}</div>
+  {% if s.discovery_questions %}<div class="row-subtext">Discovery questions: {{ s.discovery_questions|join:" / " }}</div>{% endif %}
+ </div>{% empty %}<p class="row-subtext">No approved offer matched.</p>{% endfor %}
+ <h3 class="section-heading" style="margin-top:14px;">Open questions</h3>
+ {% for f in c.open_questions.customer_asked %}<div class="sa-box">Customer asked: {{ f.text }}</div>{% endfor %}
+ {% for m in c.open_questions.missing_information %}<div class="sa-box">Missing: {{ m.label }}<div class="sa-ev">Suggested: "{{ m.suggested_question }}"</div></div>{% endfor %}
+ <h3 class="section-heading" style="margin-top:14px;">Possible objections</h3>
+ {% for o in c.possible_objections %}<div class="sa-box">{{ o.text }}<div class="sa-ev">{{ o.origin }}</div></div>{% empty %}<p class="row-subtext">None recorded.</p>{% endfor %}
+ <h3 class="section-heading" style="margin-top:14px;">Recommended next step</h3>
+ <div><b>{{ c.recommended_next_step.action }}</b></div><div class="row-subtext">{{ c.recommended_next_step.reason }}</div>
+</div>
+</div>
+<div class="card"><h3 class="section-heading">Previous communication</h3>
+ {% for p in c.previous_communication %}<div class="sa-box"><b>{{ p.date }}</b> - {{ p.label }}{% if p.ai %} <span class="sa-tag sa-u">AI summary</span>{% endif %}<div>{{ p.text }}</div></div>{% empty %}<p class="row-subtext">No communication recorded.</p>{% endfor %}</div>
+{% endif %}
+{% endblock %}

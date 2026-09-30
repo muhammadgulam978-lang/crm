@@ -1,0 +1,37 @@
+{% extends 'leads/base.html' %}
+{% block title %}Review call notes - {{ lead.name }}{% endblock %}
+{% block content %}
+<h1 class="page-title">Review call notes: {{ lead.name }}</h1>
+{% include 'salesai/_nav.html' %}
+{% if draft.status == 'approved' %}<div class="sa-box">Approved by {{ draft.approved_by.username }} on {{ draft.approved_at|date:"d M Y H:i" }}. <a href="{% url 'salesai:workspace' lead.pk %}">Back to workspace</a></div>
+{% elif draft.status == 'discarded' %}<div class="sa-box">Discarded. Nothing was saved.</div>
+{% else %}
+{% if draft.status == 'ai_failed' %}<div class="sa-warn">The AI draft was not available ({{ d.error }}). Write the summary yourself below.</div>{% endif %}
+<div class="sa-warn">This is an AI <b>draft</b>. Check every line against your notes, edit it, then approve. Items marked "not found in your notes" were dropped from the draft.</div>
+<div class="sa-grid"><div class="card"><h3 class="section-heading">Your notes</h3><pre style="white-space:pre-wrap;font-size:13px;">{{ draft.raw_notes }}</pre>
+ {% if d.unsupported %}<h4>Not found in your notes (not included)</h4>{% for u in d.unsupported %}<div class="sa-ev">{{ u.text|default:u.title }}</div>{% endfor %}{% endif %}</div>
+<div class="card"><form method="post" action="{% url 'salesai:draft_approve' draft.pk %}">{% csrf_token %}
+ {% if d.summary_warning %}<div class="sa-warn">{{ d.summary_warning }}</div>{% endif %}
+ <div class="form-group"><label class="field-label">Conversation summary</label><textarea name="summary" rows="4" class="form-control">{{ d.summary }}</textarea></div>
+ <div class="form-group"><label class="field-label">Confirmed requirements (one per line)</label><textarea name="requirements" rows="3" class="form-control">{{ req_lines }}</textarea></div>
+ <div class="form-group"><label class="field-label">Decision process</label><input name="decision_process" class="form-control" value="{{ d.decision_process.text }}"></div>
+ <div class="form-group"><label class="field-label">Customer concerns (one per line)</label><textarea name="concerns" rows="3" class="form-control">{{ concern_lines }}</textarea></div>
+ <div class="form-group"><label class="field-label">Open questions (one per line)</label><textarea name="open_questions" rows="3" class="form-control">{{ question_lines }}</textarea></div>
+ <h4>Agreed next step</h4>
+ <div class="form-group"><input name="next_action" class="form-control" value="{{ d.agreed_next_step.text }}" placeholder="Agreed next step"></div>
+ <div class="form-row"><div class="form-group"><label class="field-label">Responsible</label><select name="next_owner" class="form-control">{% for u in users %}<option value="{{ u.pk }}" {% if d.responsible.user_id == u.pk %}selected{% endif %}>{{ u.username }}</option>{% endfor %}</select>
+  {% if d.responsible and not d.responsible.user_id %}<div class="sa-ev">Notes mention "{{ d.responsible.text }}" - not matched to a user; please choose.</div>{% endif %}</div>
+ <div class="form-group"><label class="field-label">Due date</label><input type="date" name="next_due" class="form-control" value="{{ d.due.iso }}">{% if d.due and not d.due.iso %}<div class="sa-ev">Notes say "{{ d.due.text }}" - exact date not clear, please set it.</div>{% elif d.due.calculated %}<div class="sa-ev">Calculated from "{{ d.due.text }}" - check it.</div>{% endif %}</div>
+ <div class="form-group"><label class="field-label">Type</label><select name="next_type" class="form-control">{% for v,l in action_types %}<option value="{{ v }}" {% if v == 'other' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div></div>
+ <div class="form-group"><input name="next_reason" class="form-control" placeholder="Reason, if this differs from the AI's recommended next action"></div>
+ <h4>Follow-up tasks</h4>
+ <input type="hidden" name="task_count" value="{{ d.follow_up_tasks|length }}">
+ {% for t in d.follow_up_tasks %}<div class="sa-box"><label><input type="checkbox" name="task_{{ forloop.counter0 }}_include" checked> include</label>
+  <input name="task_{{ forloop.counter0 }}_title" class="form-control" value="{{ t.title }}">
+  <select name="task_{{ forloop.counter0 }}_owner" class="form-control" style="display:inline;width:auto;">{% for u in users %}<option value="{{ u.pk }}" {% if t.owner_id == u.pk %}selected{% endif %}>{{ u.username }}</option>{% endfor %}</select>
+  <input type="date" name="task_{{ forloop.counter0 }}_due" value="{{ t.due_iso }}" class="form-control" style="display:inline;width:auto;"><span class="sa-ev">{{ t.due_text }}</span></div>{% endfor %}
+ <p><label><input type="checkbox" name="reviewed"> I have reviewed these notes and they are correct</label></p>
+ <button class="btn">Approve and save to CRM</button></form>
+ <form method="post" action="{% url 'salesai:draft_discard' draft.pk %}" style="margin-top:8px;">{% csrf_token %}<button class="btn btn-small">Discard draft</button></form></div></div>
+{% endif %}
+{% endblock %}

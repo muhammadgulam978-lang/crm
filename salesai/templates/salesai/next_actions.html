@@ -1,0 +1,18 @@
+{% extends 'leads/base.html' %}
+{% block title %}Next actions - Raabta 360{% endblock %}
+{% block content %}
+<h1 class="page-title">Next actions</h1>
+{% include 'salesai/_nav.html' %}
+<div style="margin-bottom:12px;">
+ <a class="btn btn-small" href="?scope=mine">Mine</a> <a class="btn btn-small" href="?scope=all">All open</a>
+ <a class="btn btn-small" href="?scope=overdue">Overdue</a> <a class="btn btn-small" href="?scope=missing">Qualified without next action</a></div>
+<div class="card"><div class="table-scroll"><table>
+<thead><tr><th>Lead</th><th>Current stage</th><th>Next action</th><th>Owner</th><th>Due</th><th>Origin</th><th></th></tr></thead><tbody>
+{% for n in page %}<tr><td><a href="{% url 'salesai:workspace' n.lead_id %}">{{ n.lead.name }}</a></td><td>{{ n.stage_label }}</td><td>{{ n.action }}</td>
+ <td>{{ n.owner.username|default:"-" }}</td><td>{{ n.due_date|date:"d M Y"|default:"-" }}{% if n.overdue %} <span class="sa-tag sa-hi">overdue</span>{% endif %}</td>
+ <td>{{ n.get_origin_display }}{% if n.is_override %} <span class="sa-tag sa-me">changed</span>{% endif %}</td>
+ <td><form method="post" action="{% url 'salesai:next_action_done' n.pk %}" class="sa-inline">{% csrf_token %}<button class="btn btn-small">Done</button></form></td></tr>
+{% empty %}{% if scope != 'missing' %}<tr><td colspan="7" class="empty-state">Nothing here.</td></tr>{% endif %}{% endfor %}
+{% for i in missing %}<tr><td><a href="{% url 'salesai:workspace' i.lead_id %}">{{ i.lead.name }}</a></td><td colspan="5">Recommended: {{ i.recommendation.action }}</td><td><a href="{% url 'salesai:workspace' i.lead_id %}">Set</a></td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

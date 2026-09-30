@@ -1,0 +1,34 @@
+{% extends 'leads/base.html' %}
+{% block title %}AI Sales Assistant settings - Raabta 360{% endblock %}
+{% block content %}
+<h1 class="page-title">AI Sales Assistant settings</h1>
+{% include 'salesai/_nav.html' %}
+<div class="sa-warn">The assistant only knows what you enter here about SIS. If a list is empty it does <b>not guess</b> - it reports "unknown" (for example, market fit and service fit are not judged until you fill them in).</div>
+<div class="form-card"><div class="form-card-header"><h2>Target market &amp; behaviour</h2></div><div class="form-card-body">
+<form method="post">{% csrf_token %}
+<div class="form-row">
+ <div class="form-group"><label class="field-label">Target countries (one per line)</label><textarea class="form-control" rows="4" name="target_countries">{{ cfg.target_countries }}</textarea></div>
+ <div class="form-group"><label class="field-label">Target industries (one per line)</label><textarea class="form-control" rows="4" name="target_industries">{{ cfg.target_industries }}</textarea></div></div>
+<div class="form-row">
+ <div class="form-group"><label class="field-label">"Near-term" means within (days)</label><input class="form-control" name="near_term_days" value="{{ cfg.near_term_days }}"></div>
+ <div class="form-group"><label class="field-label">Follow-up when researching (days)</label><input class="form-control" name="followup_days_researching" value="{{ cfg.followup_days_researching }}"></div>
+ <div class="form-group"><label class="field-label">Wait for an answer (days)</label><input class="form-control" name="question_wait_days" value="{{ cfg.question_wait_days }}"></div></div>
+<div class="form-row">
+ <div class="form-group"><label class="field-label">High priority from score</label><input class="form-control" name="high_priority_score" value="{{ cfg.high_priority_score }}"></div>
+ <div class="form-group"><label class="field-label">Medium priority from score</label><input class="form-control" name="medium_priority_score" value="{{ cfg.medium_priority_score }}"></div>
+ <div class="form-group"><label class="field-label">Min. known factors (of 6)</label><input class="form-control" name="min_known_factors" value="{{ cfg.min_known_factors }}"></div></div>
+<div class="form-row">
+ <div class="form-group"><label class="field-label">Weight: need</label><input class="form-control" name="weight_need" value="{{ cfg.weight_need }}"></div>
+ <div class="form-group"><label class="field-label">Weight: readiness</label><input class="form-control" name="weight_readiness" value="{{ cfg.weight_readiness }}"></div>
+ <div class="form-group"><label class="field-label">Weight: decision-maker</label><input class="form-control" name="weight_authority" value="{{ cfg.weight_authority }}"></div></div>
+<div class="form-row">
+ <div class="form-group"><label class="field-label">Weight: deal size</label><input class="form-control" name="weight_deal_size" value="{{ cfg.weight_deal_size }}"></div>
+ <div class="form-group"><label class="field-label">Weight: delivery effort</label><input class="form-control" name="weight_effort" value="{{ cfg.weight_effort }}"></div>
+ <div class="form-group"><label class="field-label">Weight: SIS fit</label><input class="form-control" name="weight_fit" value="{{ cfg.weight_fit }}"></div></div>
+<p><label><input type="checkbox" name="ai_enabled" {% if cfg.ai_enabled %}checked{% endif %}> AI enabled (rules still work when off)</label></p>
+<p><label><input type="checkbox" name="auto_analyze_new_leads" {% if cfg.auto_analyze_new_leads %}checked{% endif %}> Review new leads automatically</label></p>
+<p><label><input type="checkbox" name="ask_budget_after_engagement" {% if cfg.ask_budget_after_engagement %}checked{% endif %}> Suggest a budget question only after need and timeline are known and the customer has replied</label></p>
+<div class="form-actions"><button class="btn">Save</button></div></form></div></div>
+
+<p style="margin-top:16px;">Products and services are managed in the <a href="{% url 'salesai:kb' %}">Product / Solution Knowledge Base</a>.</p>
+{% endblock %}

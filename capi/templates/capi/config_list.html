@@ -1,0 +1,20 @@
+{% extends 'leads/base.html' %}
+{% block title %}CAPI event mapping{% endblock %}
+{% block content %}
+<div class="list-header"><h2 class="page-title">Event Configuration &amp; Mapping</h2>
+  <a class="btn btn-small" href="{% url 'capi:config_create' %}">+ New event mapping</a></div>
+{% include 'capi/_nav.html' with nav='mapping' %}
+<p class="capi-muted">Only enabled mappings are transmitted. A mapping ties a CRM trigger to a platform conversion event.</p>
+<div class="table-card"><table class="items-table"><thead><tr><th>Name</th><th>Platform</th><th>CRM trigger</th><th>Conditions</th><th>Platform event</th><th>Value</th><th>Consent</th><th>Enabled</th><th></th></tr></thead><tbody>
+{% for c in configs %}<tr>
+<td>{{ c.name }}</td><td>{{ c.connection.get_platform_display }}</td><td>{{ c.get_trigger_key_display }}</td>
+<td class="capi-muted">{% if c.from_value %}from “{{ c.from_value }}” {% endif %}{% if c.to_value %}to “{{ c.to_value }}” {% endif %}{% if c.min_score %}score ≥ {{ c.min_score }}{% endif %}{% if not c.from_value and not c.to_value and not c.min_score %}—{% endif %}</td>
+<td class="capi-mono">{% if c.platform == 'meta' %}{{ c.platform_event_name }}{% else %}{{ c.linkedin_conversion_urn }}{% endif %}</td>
+<td>{% if c.send_value %}{{ c.effective_currency }}{% else %}—{% endif %}</td>
+<td>{% if c.require_consent %}required{% else %}not required{% endif %}</td>
+<td><form method="post" action="{% url 'capi:config_toggle' c.pk %}" class="capi-inline">{% csrf_token %}<button class="btn btn-small" style="background:{% if c.is_enabled %}#16a34a{% else %}#64748b{% endif %}">{% if c.is_enabled %}ON{% else %}OFF{% endif %}</button></form></td>
+<td><a href="{% url 'capi:config_edit' c.pk %}">Edit</a>
+{% if c.platform == 'linkedin' and c.linkedin_campaign_urns %}<form method="post" action="{% url 'capi:config_associate' c.pk %}" class="capi-inline">{% csrf_token %} <button class="btn btn-small" style="background:#0a66c2">Link campaigns</button></form>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="9" class="capi-muted" style="text-align:center">No mappings yet. Run <code>python manage.py seed_capi_defaults</code> for disabled starter mappings, or add one.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,1108 @@
+{% load custom_filters %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Raabta 360{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<div class="mobile-topbar">
+    <button type="button" class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu">&#9776;</button>
+    <span class="mobile-brand">Raabta 360</span>
+</div>
+
+<div class="app" id="appRoot">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <aside class="sidebar">
+        <button type="button" class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close menu">&#10005;</button>
+
+        <div class="brand" style="display:flex; justify-content:center; padding: 20px 0;">
+            <div style="
+                width: 140px;
+                height: 140px;
+                border-radius: 20px;
+                overflow: hidden;
+                -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%);
+                mask-image: radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%);
+            ">
+                <img src="{% static 'images/logo1.png' %}"
+                    alt="Logo"
+                    style="width:100% !important; height:100% !important; object-fit:cover !important; display:block !important;">
+            </div>
+        </div>
+        <!-- <div class="brand">Rabta CRM</div> -->
+         <div class="brand" style="text-align: center;">Rabta CRM</div>
+
+
+        <!-- MENU -->
+        <nav>
+            <a href="{% url 'dashboard' %}" class="{% if active == 'dashboard' %}active{% endif %}">
+                <span class="left"><span class="icon">&#9632;</span> Dashboard</span>
+            </a>
+
+            <a href="{% url 'calendar_view' %}" class="{% if active == 'calendar' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128197;</span> Calendar</span>
+            </a>
+
+            {% if '*' in allowed_sections or user.profile.role == 'ceo' %}
+
+            {% if '*' in allowed_sections or 'ceo_dashboard' in allowed_sections %}
+
+            <a href="{% url 'ceo_dashboard' %}" class="{% if active == 'ceo_dashboard' %}active{% endif %}">
+                <span class="left"><span class="icon">👑</span> CEO Dashboard</span>
+            </a>
+            {% endif %}
+            {% if user.is_superuser or user.profile.role == 'admin' %}
+            <a href="{% url 'user_list' %}" class="{% if active == 'users' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128100;</span> Users</span>
+            </a>
+            {% endif %}
+            {% endif %}
+            {% if user.is_superuser or 'leads' in allowed_sections or '*' in allowed_sections %}
+            <a href="{% url 'salesai:dashboard' %}" class="{% if active == 'salesai' %}active{% endif %}">
+                <span class="left"><span class="icon">&#129302;</span> AI Sales Assistant</span>
+            </a>
+            {% endif %}
+            {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'ceo' %}
+            <a href="{% url 'capi:dashboard' %}" class="{% if active == 'capi' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128260;</span> Conversion API</span>
+            </a>
+            {% endif %}
+        </nav>
+
+        <!-- CONTACTS -->
+{% if '*' in allowed_sections or 'contacts' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('contacts')">
+            CONTACTS 
+            {% if 'contacts' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-contacts">&#9658;</span>
+        </div>
+        <nav class="dropdown-section" id="section-contacts">
+            <a href="{% url 'company_list' %}" class="{% if active == 'companies' %}active{% endif %}">
+                <span class="left"><span class="icon">&#127970;</span> Companies</span>
+                <span class="badge badge-blue">{{ sidebar_counts.companies }}</span>
+            </a>
+            <a href="{% url 'contact_list' %}" class="{% if active == 'contacts' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128101;</span> Contacts</span>
+                <span class="badge badge-purple">{{ sidebar_counts.contacts }}</span>
+            </a>
+        </nav>
+{% endif %}
+
+        <!-- PIPELINE -->
+{% if '*' in allowed_sections or 'pipeline' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('pipeline')">
+            PIPELINE
+            {% if 'pipeline' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-pipeline">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-pipeline">
+            <a href="{% url 'opportunity_pipeline' %}" class="{% if active == 'pipeline' %}active{% endif %}">
+                <span class="left"><span class="icon">&#9698;</span> Pipeline</span>
+                <span class="badge badge-blue">{{ sidebar_counts.opportunities }}</span>
+            </a>
+            <a href="{% url 'opportunity_list' %}" class="{% if active == 'opportunities' %}active{% endif %}">
+                <span class="left"><span class="icon">&#127942;</span> Opportunities</span>
+            </a>
+            <a href="{% url 'opportunity_list' %}?stage=won" class="{% if active == 'won' %}active{% endif %}">
+                <span class="left"><span class="icon">&#10003;</span> Won</span>
+                <span class="badge badge-green">{{ sidebar_counts.won }}</span>
+            </a>
+        </nav>
+{% endif %}
+
+        <!-- QUOTATIONS -->
+{% if '*' in allowed_sections or 'quotations' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('quotations')">
+            QUOTATIONS 
+            {% if 'quotations' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-quotations">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-quotations">
+            <a href="{% url 'quotation_list' %}" class="{% if active == 'quotations' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128203;</span> All Quotations</span>
+                <span class="badge badge-blue">{{ sidebar_counts.quotations }}</span>
+            </a>
+            <a href="{% url 'quotation_list' %}?status=draft">
+                <span class="left"><span class="icon">&#9998;</span> Draft</span>
+            </a>
+            <a href="{% url 'quotation_list' %}?status=approved">
+                <span class="left"><span class="icon">&#10003;</span> Approved</span>
+            </a>
+            {% if request.user|has_full_access:'quotations' %}
+            <a href="{% url 'quotation_create' %}">
+                <span class="left"><span class="icon">&#43;</span> New Quotation</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+{% if '*' in allowed_sections or 'quotations' in allowed_sections %}
+<div class="section-label dropdown-toggle" onclick="toggleSection('proposals')">
+    PROPOSALS <span class="arrow" id="arrow-proposals">&#9658;</span>
+</div>
+<nav class="dropdown-section" id="section-proposals">
+    <a href="{% url 'proposal_list' %}" class="{% if active == 'proposals' %}active{% endif %}">
+        <span class="left"><span class="icon">&#129302;</span> All Proposals</span>
+    </a>
+    <a href="{% url 'proposal_writer' %}">
+        <span class="left"><span class="icon">&#43;</span> Write with AI</span>
+    </a>
+</nav>
+{% endif %}
+
+        <!-- PROJECTS -->
+{% if '*' in allowed_sections or 'projects' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('projects')">
+            PROJECTS 
+            {% if 'projects' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-projects">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-projects">
+            <a href="{% url 'project_list' %}" class="{% if active == 'projects' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128196;</span> All Projects</span>
+                <span class="badge badge-blue">{{ sidebar_counts.projects }}</span>
+            </a>
+            <a href="{% url 'project_list' %}?status=active">
+                <span class="left"><span class="icon">&#9654;</span> Active</span>
+            </a>
+            <a href="{% url 'project_list' %}?status=completed">
+                <span class="left"><span class="icon">&#10003;</span> Completed</span>
+            </a>
+            {% if request.user|has_full_access:'projects' %}
+            <a href="{% url 'project_create' %}">
+                <span class="left"><span class="icon">&#43;</span> New Project</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+        <!-- MEETINGS -->
+{% if '*' in allowed_sections or 'meetings' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('meetings')">
+            MEETINGS 
+            {% if 'meetings' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-meetings">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-meetings">
+            <a href="{% url 'meeting_list' %}" class="{% if active == 'meetings' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128197;</span> All Meetings</span>
+                <span class="badge badge-blue">{{ sidebar_counts.meetings }}</span>
+            </a>
+            <a href="{% url 'meeting_list' %}?scope=today">
+                <span class="left"><span class="icon">&#9200;</span> Today</span>
+                <span class="badge badge-orange">{{ sidebar_counts.meetings_today }}</span>
+            </a>
+            <a href="{% url 'meeting_list' %}?scope=upcoming">
+                <span class="left"><span class="icon">&#128337;</span> Upcoming</span>
+            </a>
+            {% if request.user|has_full_access:'meetings' %}
+            <a href="{% url 'meeting_create' %}">
+                <span class="left"><span class="icon">&#43;</span> Schedule Meeting</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+        <!-- TASKS -->
+{% if '*' in allowed_sections or 'tasks' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('tasks')">
+            TASKS 
+            {% if 'tasks' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-tasks">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-tasks">
+            <a href="{% url 'general_task_list' %}" class="{% if active == 'general_tasks' %}active{% endif %}">
+                <span class="left"><span class="icon">&#9989;</span> All Tasks</span>
+                <span class="badge badge-blue">{{ sidebar_counts.tasks_pending }}</span>
+            </a>
+            <a href="{% url 'general_task_list' %}?scope=mine">
+                <span class="left"><span class="icon">&#128100;</span> Mine</span>
+            </a>
+            <a href="{% url 'general_task_list' %}?scope=overdue">
+                <span class="left"><span class="icon">&#9888;</span> Overdue</span>
+                <span class="badge badge-red">{{ sidebar_counts.tasks_overdue }}</span>
+            </a>
+            {% if request.user|has_full_access:'tasks' %}
+            <a href="{% url 'general_task_create' %}">
+                <span class="left"><span class="icon">&#43;</span> New Task</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+{% if '*' in allowed_sections or 'salespersons' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('salespersons')">
+            SALES PERSONS 
+            {% if 'salespersons' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-salespersons">&#9658;</span>
+        </div>
+        <nav class="dropdown-section" id="section-salespersons">
+            <a href="{% url 'salesperson_list' %}" class="{% if active == 'salespersons' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128100;</span> All SPOs</span>
+            </a>
+            {% if request.user|has_full_access:'salespersons' %}
+            <a href="{% url 'salesperson_create' %}">
+                <span class="left"><span class="icon">&#43;</span> Add SPO</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+
+        <!-- LEAD -->
+{% if '*' in allowed_sections or 'leads' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('lead')">
+            LEAD
+            {% if 'leads' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-lead">&#9658;</span>
+        </div>
+        <nav class="dropdown-section" id="section-lead">
+            {% if request.user|has_full_access:'leads' %}
+            <a href="{% url 'create_lead' %}" class="{% if active == 'create_lead' %}active{% endif %}">
+                <span class="left"><span class="icon">&#43;</span> Create Lead</span>
+            </a>
+            {% endif %}
+            <a href="{% url 'all_leads' %}" class="{% if active == 'all_leads' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128276;</span> All Leads</span>
+                <span class="badge badge-blue">{{ sidebar_counts.total }}</span>
+            </a>
+            <a href="{% url 'lead_status_list' 'new' %}" class="{% if active == 'new' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128276;</span> New</span>
+                <span class="badge badge-blue">{{ sidebar_counts.new }}</span>
+            </a>
+            <a href="{% url 'lead_status_list' 'positive' %}" class="{% if active == 'positive' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128077;</span> Positive</span>
+                <span class="badge badge-purple">{{ sidebar_counts.positive }}</span>
+            </a>
+            <a href="{% url 'lead_status_list' 'lost' %}" class="{% if active == 'lost' %}active{% endif %}">
+                <span class="left"><span class="icon">&#10006;</span> Lost</span>
+                <span class="badge badge-red">{{ sidebar_counts.lost }}</span>
+            </a>
+            <a href="{% url 'lead_status_list' 'quotation' %}" class="{% if active == 'quotation' %}active{% endif %}">
+                <span class="left"><span class="icon">$</span> Quotation</span>
+                <span class="badge badge-orange">{{ sidebar_counts.quotation }}</span>
+            </a>
+            <a href="{% url 'lead_status_list' 'converted' %}" class="{% if active == 'converted' %}active{% endif %}">
+                <span class="left"><span class="icon">$</span> Converted</span>
+                <span class="badge badge-green">{{ sidebar_counts.convert }}</span>
+            </a>
+        </nav>
+{% endif %}
+
+        <!-- PAYMENT -->
+{% if '*' in allowed_sections or 'payments' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('payment')">
+            PAYMENT 
+            {% if 'payments' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-payment">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-payment">
+            <a href="{% url 'payment_advance' %}" class="{% if active == 'advance' %}active{% endif %}">
+                <span class="left"><span class="icon">$</span> Advance</span>
+                <span class="badge badge-red">{{ sidebar_counts.payment_advance }}</span>
+            </a>
+            <a href="{% url 'payment_full' %}" class="{% if active == 'full' %}active{% endif %}">
+                <span class="left"><span class="icon">$</span> Full</span>
+                <span class="badge badge-green">{{ sidebar_counts.payment_full }}</span>
+            </a>
+            <a href="{% url 'scheduled_payment_list' %}" class="{% if active == 'scheduled' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128197;</span> Scheduled</span>
+                <span class="badge badge-blue">{{ sidebar_counts.payment_scheduled }}</span>
+            </a>
+        </nav>
+{% endif %}
+
+        <!-- FOLLOWUP -->
+{% if '*' in allowed_sections or 'followups' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('followup')">
+            FOLLOWUP 
+            {% if 'followups' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-followup">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-followup">
+            <a href="{% url 'followup_list' 'pending' %}" class="{% if active == 'pending' %}active{% endif %}">
+                <span class="left"><span class="icon">&#9742;</span> Pending</span>
+                <span class="badge badge-orange">{{ sidebar_counts.followup_pending }}</span>
+            </a>
+            <a href="{% url 'followup_list' 'today' %}" class="{% if active == 'today' %}active{% endif %}">
+                <span class="left"><span class="icon">&#9742;</span> Today</span>
+                <span class="badge badge-orange">{{ sidebar_counts.followup_today }}</span>
+            </a>
+            <a href="{% url 'followup_list' 'next' %}" class="{% if active == 'next' %}active{% endif %}">
+                <span class="left"><span class="icon">&#9742;</span> Next</span>
+                <span class="badge badge-orange">{{ sidebar_counts.followup_next }}</span>
+            </a>
+            <a href="{% url 'followup_list' 'done' %}" class="{% if active == 'done' %}active{% endif %}">
+                <span class="left"><span class="icon">&#9742;</span> Done</span>
+                <span class="badge badge-orange">{{ sidebar_counts.followup_done }}</span>
+            </a>
+        </nav>
+{% endif %}
+
+        <!-- COMMUNICATIONS -->
+{% if '*' in allowed_sections or 'communications' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('communications')">
+            COMMUNICATIONS 
+            {% if 'communications' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-communications">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-communications">
+            <a href="{% url 'communication_list' %}" class="{% if active == 'communications' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128172;</span> All Logs</span>
+                <span class="badge badge-blue">{{ sidebar_counts.communications }}</span>
+            </a>
+            <a href="{% url 'communication_list' %}?type=email">
+                <span class="left"><span class="icon">&#128140;</span> Emails</span>
+            </a>
+            <a href="{% url 'communication_list' %}?type=call">
+                <span class="left"><span class="icon">&#128222;</span> Calls</span>
+            </a>
+            <a href="{% url 'communication_list' %}?type=whatsapp">
+                <span class="left"><span class="icon">&#128241;</span> WhatsApp</span>
+            </a>
+            <a href="{% url 'communication_create' %}">
+                <span class="left"><span class="icon">&#43;</span> Log Communication</span>
+            </a>
+        </nav>
+{% endif %}
+
+        <!-- EMAILS -->
+{% if '*' in allowed_sections or 'emails' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('emails')">
+            EMAILS 
+            {% if 'emails' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-emails">&#9658;</span>
+        </div>
+        <nav class="dropdown-section" id="section-emails">
+            <a href="{% url 'email_inbox' %}" class="{% if active == 'emails' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128231;</span> All Emails</span>
+                <span class="badge badge-blue">{{ sidebar_counts.emails }}</span>
+            </a>
+            {% if request.user|has_full_access:'emails' %}
+            <a href="{% url 'email_compose' %}">
+                <span class="left"><span class="icon">&#43;</span> Compose Email</span>
+            </a>
+            <a href="{% url 'bulk_email_sender' %}">
+                <span class="left"><span class="icon">&#128231;</span> Bulk Sender</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+        <!-- CALLING -->
+{% if '*' in allowed_sections or 'calling' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('calling')">
+            CALLING 
+            {% if 'calling' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-calling">&#9658;</span>
+        </div>
+        <nav class="dropdown-section" id="section-calling">
+            <a href="{% url 'call_log_list' %}" class="{% if active == 'call_logs' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128222;</span> Call History</span>
+                <span class="badge badge-blue">{{ sidebar_counts.calls_total }}</span>
+            </a>
+            <a href="{% url 'call_log_list' %}?channel=phone">
+                <span class="left"><span class="icon">&#9742;</span> Phone Calls</span>
+            </a>
+            <a href="{% url 'call_log_list' %}?channel=whatsapp">
+                <span class="left"><span class="icon">&#128241;</span> WhatsApp Calls</span>
+            </a>
+            <a href="{% url 'call_schedule_list' %}" class="{% if active == 'scheduled_calls' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128197;</span> Scheduled Calls</span>
+                <span class="badge badge-orange">{{ sidebar_counts.calls_scheduled }}</span>
+            </a>
+            {% if not google_connected %}
+            <a href="{% url 'google_authorize' %}">
+                <span class="left"><span class="icon">&#128279;</span> Connect Calendar</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+        <!-- SUPPORT -->
+{% if '*' in allowed_sections or 'support' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('support')">
+            SUPPORT 
+            {% if 'support' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-support">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-support">
+            <a href="{% url 'ticket_list' %}" class="{% if active == 'tickets' %}active{% endif %}">
+                <span class="left"><span class="icon">&#127917;</span> All Tickets</span>
+                <span class="badge badge-blue">{{ sidebar_counts.tickets_open }}</span>
+            </a>
+            <a href="{% url 'ticket_list' %}?status=open">
+                <span class="left"><span class="icon">&#128308;</span> Open</span>
+            </a>
+            <a href="{% url 'ticket_list' %}?priority=critical">
+                <span class="left"><span class="icon">&#9888;</span> Critical</span>
+                <span class="badge badge-red">{{ sidebar_counts.tickets_critical }}</span>
+            </a>
+            <a href="{% url 'ticket_list' %}?status=resolved">
+                <span class="left"><span class="icon">&#10003;</span> Resolved</span>
+            </a>
+            {% if request.user|has_full_access:'support' %}
+            <a href="{% url 'ticket_create' %}">
+                <span class="left"><span class="icon">&#43;</span> New Ticket</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+        <!-- ACTIVITY -->
+{% if '*' in allowed_sections or 'activity' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('activity')">
+            ACTIVITY 
+            {% if 'activity' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-activity">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-activity">
+            <a href="{% url 'activity_log' %}" class="{% if active == 'activity_log' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128336;</span> Activity Log</span>
+                <span class="badge badge-purple">{{ sidebar_counts.activity_today }}</span>
+            </a>
+        </nav>
+{% endif %}
+
+        <!-- REPORTS -->
+{% if '*' in allowed_sections or 'reports' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('reports')">
+            REPORTS 
+            {% if 'reports' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-reports">&#9660;</span>
+        </div>
+        <nav class="dropdown-section" id="section-reports">
+            <a href="{% url 'reports' %}" class="{% if active == 'reports' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128202;</span> Analytics</span>
+            </a>
+            <a href="{% url 'sales_forecast' %}">
+                <span class="left"><span class="icon">📈</span> AI Forecast</span>
+            </a>
+        </nav>
+{% endif %}
+
+        <!-- DOCUMENTS -->
+{% if '*' in allowed_sections or 'documents' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('documents')">
+            DOCUMENTS 
+            {% if 'documents' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-documents">&#9658;</span>
+        </div>
+        <nav class="dropdown-section" id="section-documents">
+            <a href="{% url 'document_list' %}" class="{% if active == 'documents' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128194;</span> All Documents</span>
+                <span class="badge badge-blue">{{ sidebar_counts.documents }}</span>
+            </a>
+            <a href="{% url 'document_list' %}?type=contract">
+                <span class="left"><span class="icon">&#128221;</span> Contracts</span>
+            </a>
+            <a href="{% url 'document_list' %}?type=proposal">
+                <span class="left"><span class="icon">&#128203;</span> Proposals</span>
+            </a>
+            <a href="{% url 'document_upload' %}">
+                <span class="left"><span class="icon">&#11014;</span> Upload</span>
+            </a>
+        </nav>
+{% endif %}
+
+{% if '*' in allowed_sections %}
+<div class="section-label">WHATSAPP</div>
+<nav>
+    <a href="{% url 'bulk_whatsapp_sender' %}"
+       class="{% if active == 'bulk_whatsapp' %}active{% endif %}">
+        <span class="left"><span class="icon">&#128172;</span> Bulk Sender</span>
+    </a>
+</nav>
+{% endif %}
+
+        <!-- CONTRACTS -->
+{% if '*' in allowed_sections or 'contracts' in allowed_sections %}
+        <div class="section-label dropdown-toggle" onclick="toggleSection('contracts')">
+            CONTRACTS 
+            {% if 'contracts' in view_only_sections %}
+            <span style="font-size:10px; color:#fff; opacity:0.6; margin-left:4px;">👁 view only</span>
+            {% endif %}
+            <span class="arrow" id="arrow-contracts">&#9658;</span>
+        </div>
+        <nav class="dropdown-section" id="section-contracts">
+            <a href="{% url 'contract_list' %}" class="{% if active == 'contracts' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128221;</span> All Contracts</span>
+                <span class="badge badge-blue">{{ sidebar_counts.contracts_active }}</span>
+            </a>
+            <a href="{% url 'contract_list' %}?status=draft">
+                <span class="left"><span class="icon">&#9998;</span> Draft</span>
+                <span class="badge badge-orange">{{ sidebar_counts.contracts_draft }}</span>
+            </a>
+            <a href="{% url 'contract_list' %}?status=signed">
+                <span class="left"><span class="icon">&#10003;</span> Signed</span>
+            </a>
+            {% if request.user|has_full_access:'contracts' %}
+            <a href="{% url 'contract_create' %}">
+                <span class="left"><span class="icon">&#43;</span> New Contract</span>
+            </a>
+            {% endif %}
+        </nav>
+{% endif %}
+
+        <!-- ACCOUNT -->
+        {% if user.is_authenticated %}
+        <div class="section-label">ACCOUNT</div>
+        <nav>
+            <a href="{% url 'logout' %}">
+                <span class="left"><span class="icon">&#10148;</span> Logout ({{ user.username }})</span>
+            </a>
+        </nav>
+        {% endif %}
+    </aside>
+
+    <main class="main">
+        <div class="topbar">
+            <div style="flex:1;"></div>
+            <a href="{% url 'notification_list' %}" class="notif-bell">
+                &#128276;
+                {% if sidebar_counts.unread_notifications > 0 %}
+                <span class="notif-count">{{ sidebar_counts.unread_notifications }}</span>
+                {% endif %}
+            </a>
+        </div>
+
+        {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+            <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+<script>
+// mobile hamburger sidebar toggle
+(function() {
+    const appRoot = document.getElementById('appRoot');
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const closeBtn = document.getElementById('sidebarCloseBtn');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    function openSidebar() { appRoot.classList.add('sidebar-open'); }
+    function closeSidebar() { appRoot.classList.remove('sidebar-open'); }
+
+    if (hamburgerBtn) hamburgerBtn.addEventListener('click', openSidebar);
+    if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+
+    // close sidebar automatically when a nav link is tapped on mobile
+    document.querySelectorAll('.sidebar nav a').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 900) closeSidebar();
+        });
+    });
+})();
+
+// remember open/closed state in localStorage
+function toggleSection(name) {
+    const section = document.getElementById('section-' + name);
+    const arrow = document.getElementById('arrow-' + name);
+    const isOpen = section.classList.contains('open');
+
+    if (isOpen) {
+        section.classList.remove('open');
+        arrow.innerHTML = '&#9658;';
+        localStorage.setItem('sidebar-' + name, 'closed');
+    } else {
+        section.classList.add('open');
+        arrow.innerHTML = '&#9660;';
+        localStorage.setItem('sidebar-' + name, 'open');
+    }
+}
+
+// restore state on page load
+const sections = [
+    'contacts', 'pipeline', 'quotations', 'proposals', 'projects',
+    'meetings', 'tasks', 'lead', 'payment', 'followup',
+
+    'communications', 'support', 'activity', 'reports',
+
+    'communications', 'emails', 'support', 'activity', 'reports',
+
+    'documents', 'contracts', 'salespersons'
+];
+
+sections.forEach(name => {
+    const state = localStorage.getItem('sidebar-' + name);
+    const section = document.getElementById('section-' + name);
+    const arrow = document.getElementById('arrow-' + name);
+    if (!section || !arrow) return;
+
+    // default open for active section, closed for others
+    const hasActive = section.querySelector('a.active');
+    if (state === 'open' || (!state && hasActive)) {
+        section.classList.add('open');
+        arrow.innerHTML = '&#9660;';
+    } else {
+        section.classList.remove('open');
+        arrow.innerHTML = '&#9658;';
+    }
+});
+</script>
+
+<div id="assistant-widget">
+    <button id="assistant-toggle">💬</button>
+    <div id="assistant-panel">
+
+        <div id="assistant-header">
+            <span id="assistant-header-title">Assistant</span>
+            <div id="assistant-header-actions">
+                <button id="assistant-clear" title="Clear conversation">🗑</button>
+                <button id="assistant-switch" title="Switch assistant">⇄</button>
+                <button id="assistant-close" title="Close">✕</button>
+            </div>
+        </div>
+
+        <div id="assistant-selector">
+            <p class="assistant-selector-label">Choose an assistant</p>
+            <button type="button" data-type="crm">CRM Assistant</button>
+            <button type="button" data-type="sales">Sales Assistant</button>
+        </div>
+
+        <div id="assistant-chat">
+            <div id="assistant-messages"></div>
+            <div id="assistant-input-row">
+                <input type="text" id="assistant-input" placeholder="Ask something...">
+                <button type="button" id="assistant-send">Send</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+#assistant-widget, #assistant-widget * {
+    box-sizing: border-box !important;
+}
+
+#assistant-widget {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    z-index: 999999 !important;
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+#assistant-widget #assistant-toggle {
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 50% !important;
+    background: #1d5fbf !important;
+    color: #fff !important;
+    border: none !important;
+    font-size: 22px !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+}
+
+#assistant-widget #assistant-panel {
+    width: 360px !important;
+    height: 480px !important;
+    max-width: calc(100vw - 40px) !important;
+    background: #fff !important;
+    border-radius: 14px !important;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important;
+    position: absolute !important;
+    bottom: 70px !important;
+    right: 0 !important;
+    display: none !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#assistant-widget #assistant-panel.open {
+    display: flex !important;
+}
+
+#assistant-widget #assistant-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #1d5fbf !important;
+    color: #fff !important;
+    padding: 12px 16px !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+}
+
+#assistant-widget #assistant-header-title {
+    font-weight: 600 !important;
+    font-size: 15px !important;
+    color: #fff !important;
+}
+
+#assistant-widget #assistant-header-actions {
+    display: flex !important;
+    gap: 8px !important;
+}
+
+#assistant-widget #assistant-header-actions button {
+    background: rgba(255,255,255,0.15) !important;
+    border: none !important;
+    color: #fff !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+    padding: 0 !important;
+    display: none !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#assistant-widget #assistant-header-actions button.visible {
+    display: flex !important;
+}
+
+#assistant-widget #assistant-header-actions button:hover {
+    background: rgba(255,255,255,0.28) !important;
+}
+
+#assistant-widget #assistant-selector {
+    padding: 20px 16px !important;
+    display: none !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    flex: 1 !important;
+    width: 100% !important;
+}
+
+#assistant-widget #assistant-selector.visible {
+    display: flex !important;
+}
+
+#assistant-widget .assistant-selector-label {
+    font-size: 13px !important;
+    color: #888 !important;
+    margin: 0 0 4px 0 !important;
+}
+
+#assistant-widget #assistant-selector button {
+    padding: 12px !important;
+    border-radius: 10px !important;
+    border: 1px solid #e2e2e2 !important;
+    background: #fafafa !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    width: 100% !important;
+    color: #222 !important;
+}
+
+#assistant-widget #assistant-selector button:hover {
+    background: #eaf1fc !important;
+    border-color: #1d5fbf !important;
+}
+
+#assistant-widget #assistant-chat {
+    display: none !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    width: 100% !important;
+}
+
+#assistant-widget #assistant-chat.visible {
+    display: flex !important;
+}
+
+#assistant-widget #assistant-messages {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+}
+
+#assistant-widget .assistant-msg {
+    padding: 9px 13px !important;
+    border-radius: 12px !important;
+    max-width: 80% !important;
+    white-space: pre-wrap !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+}
+
+#assistant-widget .assistant-msg.user {
+    background: #1d5fbf !important;
+    color: #fff !important;
+    align-self: flex-end !important;
+    border-bottom-right-radius: 4px !important;
+}
+
+#assistant-widget .assistant-msg.assistant {
+    background: #f1f1f3 !important;
+    color: #222 !important;
+    align-self: flex-start !important;
+    border-bottom-left-radius: 4px !important;
+}
+
+#assistant-widget #assistant-input-row {
+    display: flex !important;
+    border-top: 1px solid #eee !important;
+    flex-shrink: 0 !important;
+    padding: 8px !important;
+    gap: 8px !important;
+    width: 100% !important;
+}
+
+#assistant-widget #assistant-input {
+    flex: 1 !important;
+    border: 1px solid #ddd !important;
+    border-radius: 8px !important;
+    padding: 9px 12px !important;
+    font-size: 14px !important;
+    outline: none !important;
+    background: #fff !important;
+    color: #222 !important;
+}
+
+#assistant-widget #assistant-input:focus {
+    border-color: #1d5fbf !important;
+}
+
+#assistant-widget #assistant-send {
+    border: none !important;
+    background: #1d5fbf !important;
+    color: #fff !important;
+    padding: 0 16px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+#assistant-widget #assistant-send:hover {
+    opacity: 0.9 !important;
+}
+</style>
+
+<script>
+(function() {
+    let currentType = null;
+    let conversationId = null;
+    let hasBothAssistants = false;
+
+    const toggle = document.getElementById('assistant-toggle');
+    const panel = document.getElementById('assistant-panel');
+    const selector = document.getElementById('assistant-selector');
+    const chatBox = document.getElementById('assistant-chat');
+    const messagesEl = document.getElementById('assistant-messages');
+    const input = document.getElementById('assistant-input');
+    const sendBtn = document.getElementById('assistant-send');
+    const headerTitle = document.getElementById('assistant-header-title');
+    const switchBtn = document.getElementById('assistant-switch');
+    const closeBtn = document.getElementById('assistant-close');
+    const clearBtn = document.getElementById('assistant-clear');
+
+    function getCookie(name) {
+        const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return match ? match.pop() : '';
+    }
+
+    function saveState() {
+        if (currentType) {
+            sessionStorage.setItem('assistant_type', currentType);
+        } else {
+            sessionStorage.removeItem('assistant_type');
+        }
+        if (conversationId) {
+            sessionStorage.setItem('assistant_conversation_id', conversationId);
+        } else {
+            sessionStorage.removeItem('assistant_conversation_id');
+        }
+    }
+
+    function appendMessage(role, text) {
+        const div = document.createElement('div');
+        div.className = 'assistant-msg ' + role;
+        div.textContent = text;
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function showSelector() {
+        chatBox.classList.remove('visible');
+        selector.classList.add('visible');
+        switchBtn.classList.remove('visible');
+        headerTitle.textContent = 'Assistant';
+        currentType = null;
+        conversationId = null;
+        messagesEl.innerHTML = '';
+        saveState();
+    }
+
+    async function openChat(type, restoreConversationId) {
+        currentType = type;
+        conversationId = restoreConversationId || null;
+        selector.classList.remove('visible');
+        chatBox.classList.add('visible');
+        messagesEl.innerHTML = '';
+        headerTitle.textContent = type === 'crm' ? 'CRM Assistant' : 'Sales Assistant';
+        if (hasBothAssistants) {
+            switchBtn.classList.add('visible');
+        } else {
+            switchBtn.classList.remove('visible');
+        }
+        saveState();
+
+        if (conversationId) {
+            try {
+                const res = await fetch('/assistant/history/' + conversationId + '/');
+                const data = await res.json();
+                (data.messages || []).forEach(m => appendMessage(m.role, m.content));
+            } catch (e) {
+                // if history fetch fails, just start fresh silently
+                conversationId = null;
+                saveState();
+            }
+        }
+
+        input.focus();
+    }
+
+    function startNewConversation() {
+        conversationId = null;
+        messagesEl.innerHTML = '';
+        saveState();
+        if (currentType) {
+            appendMessage('assistant', 'Started a new conversation. What can I help with?');
+        }
+    }
+
+    toggle.addEventListener('click', async () => {
+        const opening = !panel.classList.contains('open');
+
+        if (opening) {
+            panel.classList.add('open');
+
+            const alreadyShowing = selector.classList.contains('visible') || chatBox.classList.contains('visible');
+            if (!alreadyShowing) {
+                const res = await fetch('/assistant/config/');
+                const cfg = await res.json();
+
+                if (cfg.crm_access === 'none' && cfg.sales_access === 'none') {
+                    headerTitle.textContent = 'Assistant';
+                    chatBox.classList.add('visible');
+                    appendMessage('assistant', "You don't have access to any assistant. Contact your admin.");
+                    return;
+                }
+
+                hasBothAssistants = cfg.crm_access !== 'none' && cfg.sales_access !== 'none';
+
+                const savedType = sessionStorage.getItem('assistant_type');
+                const savedConversationId = sessionStorage.getItem('assistant_conversation_id');
+
+                if (savedType && (savedType === 'crm' ? cfg.crm_access !== 'none' : cfg.sales_access !== 'none')) {
+                    openChat(savedType, savedConversationId);
+                } else if (hasBothAssistants) {
+                    showSelector();
+                } else {
+                    openChat(cfg.crm_access !== 'none' ? 'crm' : 'sales');
+                }
+            }
+        } else {
+            panel.classList.remove('open');
+        }
+    });
+
+    closeBtn.addEventListener('click', () => { panel.classList.remove('open'); });
+
+    switchBtn.addEventListener('click', showSelector);
+
+    clearBtn.addEventListener('click', startNewConversation);
+
+    selector.querySelectorAll('button[data-type]').forEach(btn => {
+        btn.addEventListener('click', () => openChat(btn.dataset.type));
+    });
+
+    async function sendMessage() {
+        const text = input.value.trim();
+        if (!text || !currentType) return;
+        appendMessage('user', text);
+        input.value = '';
+
+        const res = await fetch('/assistant/chat/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                assistant_type: currentType,
+                message: text,
+                conversation_id: conversationId,
+            }),
+        });
+        const data = await res.json();
+        conversationId = data.conversation_id || conversationId;
+        saveState();
+        appendMessage('assistant', data.response || 'No response.');
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+})();
+</script>
+
+</body>
+</html>

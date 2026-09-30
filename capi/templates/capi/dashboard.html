@@ -1,0 +1,56 @@
+{% extends 'leads/base.html' %}
+{% block title %}Conversion API Center{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Conversion API Center</h2>
+  <form method="post" action="{% url 'capi:process_now' %}" class="capi-inline">{% csrf_token %}
+    <button class="btn btn-small" type="submit">Process queue now</button></form>
+</div>
+{% include 'capi/_nav.html' with nav='dashboard' %}
+
+<div class="kpi-grid">
+  {% for label, value in kpis %}
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">{{ label }}</div><div class="kpi-value">{{ value }}</div></div></div>
+  {% endfor %}
+</div>
+
+<div class="capi-grid" style="margin-top:18px">
+  {% for c in connections %}
+  <div class="card">
+    <h3 style="margin-top:0">{{ c.get_platform_display }}</h3>
+    <p>Connection: {% if c.is_active %}<span class="badge badge-green">active</span>{% else %}<span class="badge badge-purple">inactive</span>{% endif %}
+       &nbsp;API health: {% include 'capi/_status.html' with s=c.health_status %}
+       &nbsp;Token: {% include 'capi/_status.html' with s=c.token_status %}</p>
+    <p class="capi-muted">{% if c.last_checked_at %}Last checked {{ c.last_checked_at|date:"d M, H:i" }}. {{ c.health_message }}{% else %}Never checked.{% endif %}</p>
+    <a class="btn btn-small" href="{% url 'capi:connections' %}">Manage</a>
+  </div>
+  {% endfor %}
+  <div class="card">
+    <h3 style="margin-top:0">Event configuration</h3>
+    <p><strong>{{ enabled_configs }}</strong> of {{ total_configs }} event mapping(s) enabled.</p>
+    <p class="capi-muted">Only enabled mappings are ever sent. Everything else stays in the CRM.</p>
+    <a class="btn btn-small" href="{% url 'capi:config_list' %}">Event mapping</a>
+  </div>
+</div>
+
+<div class="capi-grid" style="margin-top:18px">
+  <div class="table-card"><h3 style="padding:14px 16px 0;margin:0">Events by type (30 days)</h3>
+    <table class="items-table"><thead><tr><th>Platform</th><th>Event</th><th>Status</th><th>Count</th></tr></thead><tbody>
+    {% for r in by_event %}<tr><td>{{ r.platform }}</td><td>{{ r.event_name }}</td><td>{% include 'capi/_status.html' with s=r.status %}</td><td>{{ r.n }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="capi-muted">No events yet.</td></tr>{% endfor %}</tbody></table></div>
+
+  <div class="table-card"><h3 style="padding:14px 16px 0;margin:0">Attribution: sent by campaign</h3>
+    <table class="items-table"><thead><tr><th>Platform</th><th>Campaign</th><th>Sent</th></tr></thead><tbody>
+    {% for r in by_campaign %}<tr><td>{{ r.platform }}</td><td>{{ r.campaign_name }}</td><td>{{ r.n }}</td></tr>
+    {% empty %}<tr><td colspan="3" class="capi-muted">No attributed events yet.</td></tr>{% endfor %}</tbody></table></div>
+
+  <div class="table-card"><h3 style="padding:14px 16px 0;margin:0">Identifiers sent (last 500 sent)</h3>
+    <table class="items-table"><thead><tr><th>Identifier</th><th>Events</th><th>Coverage</th></tr></thead><tbody>
+    {% for k, n, pct in coverage %}<tr><td>{{ k }}</td><td>{{ n }}</td><td>{{ pct }}%</td></tr>
+    {% empty %}<tr><td colspan="3" class="capi-muted">Nothing sent yet.</td></tr>{% endfor %}</tbody></table>
+    <p class="capi-muted" style="padding:0 16px 12px">Shows what we supplied for matching. Actual match quality is reported by Meta / LinkedIn in their own dashboards.</p></div>
+</div>
+
+<div class="table-card" style="margin-top:18px"><h3 style="padding:14px 16px 0;margin:0">Latest events</h3>
+  {% include 'capi/_event_rows.html' with events=recent %}</div>
+{% endblock %}

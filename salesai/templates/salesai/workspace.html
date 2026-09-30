@@ -1,0 +1,80 @@
+{% extends 'leads/base.html' %}
+{% block title %}AI Sales Assistant - {{ lead.name }}{% endblock %}
+{% block content %}
+<h1 class="page-title">AI Sales Assistant: {{ lead.name }}</h1>
+{% include 'salesai/_nav.html' %}
+<p><a href="{% url 'lead_detail' lead.pk %}">&larr; Lead</a>{% if opp %} &middot; <a href="{% url 'opportunity_detail' opp.pk %}">Opportunity</a>{% endif %}
+ &middot; <a href="{% url 'salesai:brief' lead.pk %}">Call brief</a> &middot; <a href="{% url 'salesai:after_call' lead.pk %}">After the conversation</a></p>
+{% if stale %}<div class="sa-warn">CRM records changed since the last AI review. Run "Analyze with AI" to refresh the facts.</div>{% endif %}
+{% if insight.ai_error %}<div class="sa-warn">Last AI review problem: {{ insight.ai_error }} The rules still work with the information already in the CRM.</div>{% endif %}
+
+{% load salesai_tags %}{% salesai_panel lead %}
+
+<div class="sa-grid">
+<div class="card"><h3 class="section-heading">What we know</h3>
+ <p class="row-subtext"><span class="sa-tag sa-v">verified</span> = quoted from a CRM record or confirmed by a salesperson &middot; <span class="sa-tag sa-a">assumption</span> = not confirmed, never used for recommendations.</p>
+ {% for key,label,items in facts_by_key %}<div style="margin:8px 0;"><b>{{ label }}</b>
+  {% for f in items %}<div class="sa-box" style="border-color:{% if f.status == 'verified' %}#2e7d32{% else %}#e08a00{% endif %};">
+    <span class="sa-tag {% if f.status == 'verified' %}sa-v{% else %}sa-a{% endif %}">{{ f.get_status_display }}</span> {{ f.value }}
+    {% if f.key == 'timeline' and f.extra.bucket %}<span class="row-subtext">({{ f.extra.bucket }})</span>{% endif %}
+    {% if f.key == 'open_question' and f.resolved %}<span class="sa-tag sa-u">answered</span>{% endif %}
+    <div class="sa-ev">{{ f.source_label|default:"Entered by staff" }}{% if f.verified_how %} &middot; {{ f.verified_how }}{% endif %}</div>
+    {% if f.evidence %}<div class="sa-ev">"{{ f.evidence }}"</div>{% endif %}
+    {% if f.note %}<div class="sa-ev" style="color:#b26a00;">{{ f.note }}</div>{% endif %}
+    <form method="post" action="{% url 'salesai:fact_action' lead.pk f.pk 'confirm' %}" class="sa-inline">{% csrf_token %}
+     {% if f.status == 'assumed' %}
+       {% if f.key == 'timeline' and not f.extra.bucket %}<select name="bucket" class="form-control" style="display:inline;width:auto;">{% for v,l in buckets %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>{% endif %}
+       {% if f.key == 'decision_role' and not f.extra.role %}<select name="role" class="form-control" style="display:inline;width:auto;">{% for v,l in roles %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>{% endif %}
+       <button class="btn btn-small">Confirm</button>{% endif %}</form>
+    <form method="post" action="{% url 'salesai:fact_action' lead.pk f.pk 'reject' %}" class="sa-inline">{% csrf_token %}<button class="btn btn-small">Reject</button></form>
+    {% if f.key == 'open_question' %}<form method="post" action="{% url 'salesai:fact_action' lead.pk f.pk 'resolve' %}" class="sa-inline">{% csrf_token %}<button class="btn btn-small">Mark answered</button></form>{% endif %}
+  </div>{% endfor %}</div>
+ {% empty %}<p class="empty-state">Nothing recorded yet. Use "Analyze with AI" or add what the customer told you below.</p>{% endfor %}
+ {% if structured %}<div style="margin-top:8px;"><b>From CRM fields</b>{% for a,b in structured %}<div class="row-subtext">{{ a }}: {{ b }}</div>{% endfor %}</div>{% endif %}
+</div>
+
+<div class="card"><h3 class="section-heading">Add information you confirmed with the customer</h3>
+ <form method="post" action="{% url 'salesai:fact_add' lead.pk %}">{% csrf_token %}
+  <div class="form-group"><label class="field-label">Type</label><select name="key" class="form-control">{% for k,l in fact_keys %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></div>
+  <div class="form-group"><label class="field-label">What the customer said</label><textarea name="value" rows="2" class="form-control"></textarea></div>
+  <div class="form-row"><div class="form-group"><label class="field-label">If timeline: range</label><select name="bucket" class="form-control"><option value="">-</option>{% for v,l in buckets %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+  <div class="form-group"><label class="field-label">If decision role: role</label><select name="role" class="form-control"><option value="">-</option>{% for v,l in roles %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div></div>
+  <button class="btn">Save as verified</button></form>
+
+ <h3 class="section-heading" style="margin-top:20px;">Qualification</h3>
+ {% for k,f in q.fields.items %}<div class="row-subtext"><b>{{ f.label }}:</b>
+  {% if f.status == 'verified' %}<span class="sa-tag sa-v">verified</span> {{ f.value }}{% elif f.status == 'assumed' %}<span class="sa-tag sa-a">assumption</span> {{ f.value }}{% else %}<span class="sa-tag sa-u">unknown</span>{% endif %}</div>{% endfor %}
+ <div class="row-subtext" style="margin-top:6px;">Market fit: {{ q.market_fit.status }}{% for r in q.market_fit.reasons %} &middot; {{ r }}{% endfor %}</div>
+ {% for qq in questions %}<div class="sa-box">Suggested question ({{ qq.field }}): "{{ qq.text }}"
+  <form method="post" action="{% url 'salesai:question_action' lead.pk qq.pk 'asked' %}" class="sa-inline">{% csrf_token %}<button class="btn btn-small">I asked this</button></form>
+  <form method="post" action="{% url 'salesai:question_action' lead.pk qq.pk 'dismissed' %}" class="sa-inline">{% csrf_token %}<button class="btn btn-small">Not needed</button></form></div>{% endfor %}
+
+ <h3 class="section-heading" style="margin-top:20px;">Sales priority</h3>
+ {% if prio.level == 'insufficient' %}<p class="row-subtext">Not enough verified information to recommend a priority ({{ prio.known_count }} of {{ prio.total_factors }} factors known).</p>
+ {% elif prio.level == 'not_pursued' %}<p class="row-subtext">Outside the target market - no priority recommended.</p>
+ {% else %}<p>AI recommends <b>{{ prio.level|title }}</b> (score {{ prio.score }}). {% if insight.priority_final %}Your decision: <b>{{ insight.priority_final|title }}</b>.{% endif %}</p>{% endif %}
+ {% for f in prio.factors %}<div class="row-subtext">{{ f.label }}: {% if f.known %}{{ f.points }}/5{% else %}<i>unknown</i>{% endif %} &middot; {{ f.why }}</div>{% endfor %}
+ <form method="post" action="{% url 'salesai:priority_decide' lead.pk %}" style="margin-top:8px;">{% csrf_token %}
+  <select name="level" class="form-control" style="display:inline;width:auto;"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+  <input name="reason" class="form-control" style="display:inline;width:260px;" placeholder="Reason (if different from AI)"><button class="btn btn-small">Set priority</button></form>
+
+ {% if rec.code == 'OUT_OF_MARKET' %}<h3 class="section-heading" style="margin-top:20px;">Close politely</h3>
+ <form method="post" action="{% url 'salesai:close_out' lead.pk %}">{% csrf_token %}<textarea name="reason" rows="2" class="form-control">{{ rec.suggested_reason }}</textarea>
+ <button class="btn btn-small" onclick="return confirm('Close this lead?')">Record reason and close</button></form>{% endif %}
+</div>
+</div>
+
+<div class="card"><h3 class="section-heading">Next action (stage / action / owner / due)</h3>
+ <p class="row-subtext">Current stage: {{ next_action.stage_label|default:"" }}</p>
+ <form method="post" action="{% url 'salesai:next_action_set' lead.pk %}">{% csrf_token %}
+  <div class="form-row"><div class="form-group"><label class="field-label">Action type</label><select name="action_type" class="form-control">{% for v,l in action_types %}<option value="{{ v }}" {% if v == rec.action_type %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="form-group"><label class="field-label">Owner</label><select name="owner" class="form-control">{% for u in users %}<option value="{{ u.pk }}" {% if u.pk == default_owner.pk %}selected{% endif %}>{{ u.username }}</option>{% endfor %}</select></div>
+  <div class="form-group"><label class="field-label">Due date</label><input type="date" name="due_date" class="form-control" value="{{ snap.due_date }}"></div></div>
+  <div class="form-group"><label class="field-label">Action</label><input name="action" class="form-control" value="{{ next_action.action|default:rec.action }}"></div>
+  <div class="form-group"><label class="field-label">Reason (required if you change the AI recommendation)</label><input name="reason" class="form-control"></div>
+  <button class="btn">Save next action</button></form>
+ {% if next_action %}<form method="post" action="{% url 'salesai:next_action_done' next_action.pk %}" style="margin-top:6px;">{% csrf_token %}<button class="btn btn-small">Mark current action done</button></form>{% endif %}
+ {% if history %}<h4>Earlier</h4>{% for h in history %}<div class="row-subtext">{{ h.created_at|date:"d M" }} - {{ h.action }} ({{ h.get_status_display }}){% if h.is_override %} - changed from AI: {{ h.override_reason }}{% endif %}</div>{% endfor %}{% endif %}
+</div>
+{% if overrides %}<div class="card"><h3 class="section-heading">Changes to AI recommendations</h3>{% for o in overrides %}<div class="row-subtext">{{ o.created_at|date:"d M H:i" }} {{ o.user.username }}: {{ o.get_kind_display }} - {{ o.reason|default:"no reason" }}</div>{% endfor %}</div>{% endif %}
+{% endblock %}

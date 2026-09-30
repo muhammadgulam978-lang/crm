@@ -1,0 +1,11 @@
+{% extends 'leads/base.html' %}
+{% block title %}Attribution &amp; consent{% endblock %}
+{% block content %}
+<div class="list-header"><h2 class="page-title">Attribution &amp; consent — {{ lead.name }}</h2></div>
+<div class="form-card" style="max-width:760px"><div class="form-card-body" style="padding:20px 28px">
+<p class="capi-muted">Conversions are only sent for this lead when consent is “Granted” (per mapping) and the platform matches.</p>
+<form method="post">{% csrf_token %}{% include 'capi/_form_fields.html' %}
+<div class="form-actions"><a href="{% url 'lead_detail' lead.pk %}">Cancel</a><button class="btn">Save</button></div></form></div></div>
+{% if touchpoints %}<h3 style="margin-top:20px">Ad touchpoints</h3><div class="table-card"><table class="items-table"><thead><tr><th>When</th><th>Platform</th><th>Campaign</th><th>Ad set</th><th>Ad</th><th>Form</th></tr></thead><tbody>
+{% for t in touchpoints %}<tr><td>{{ t.created_at|date:"d M Y" }}</td><td>{{ t.platform }}</td><td>{{ t.campaign_name|default:t.campaign_id }}</td><td>{{ t.adset_id }}</td><td>{{ t.ad_id }}</td><td>{{ t.form_id }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% endblock %}

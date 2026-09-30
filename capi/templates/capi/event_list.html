@@ -1,0 +1,21 @@
+{% extends 'leads/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="list-header"><h2 class="page-title">{{ title }}</h2>
+  <form method="post" action="{% url 'capi:process_now' %}" class="capi-inline">{% csrf_token %}<button class="btn btn-small">Process queue now</button></form></div>
+{% include 'capi/_nav.html' with nav=tab %}
+<form method="get" class="filter-card" style="margin-bottom:14px">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <div class="filter-row">
+    <input class="form-control" name="q" value="{{ search }}" placeholder="Search lead, event, campaign, event ID">
+    <select class="form-control" name="platform"><option value="">All platforms</option>
+      <option value="meta" {% if platform == 'meta' %}selected{% endif %}>Meta</option>
+      <option value="linkedin" {% if platform == 'linkedin' %}selected{% endif %}>LinkedIn</option></select>
+    <button class="btn btn-small">Filter</button></div>
+</form>
+<div class="table-card">{% include 'capi/_event_rows.html' with events=page_obj %}</div>
+{% if page_obj.has_other_pages %}<div class="pagination">
+  {% if page_obj.has_previous %}<a href="?tab={{ tab }}&q={{ search }}&platform={{ platform }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+  <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}<a href="?tab={{ tab }}&q={{ search }}&platform={{ platform }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}</div>{% endif %}
+{% endblock %}

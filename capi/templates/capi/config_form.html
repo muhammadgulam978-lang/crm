@@ -1,0 +1,10 @@
+{% extends 'leads/base.html' %}
+{% block title %}Event mapping{% endblock %}
+{% block content %}
+<div class="list-header"><h2 class="page-title">{% if obj %}Edit{% else %}New{% endif %} event mapping</h2></div>
+{% include 'capi/_nav.html' with nav='mapping' %}
+<div class="form-card" style="max-width:760px"><div class="form-card-body" style="padding:20px 28px">
+<p class="capi-muted">Lead statuses: new, positive, lost, quotation, converted · Opportunity stages: new, contacted, qualified, proposal, negotiation, won, lost.</p>
+<form method="post">{% csrf_token %}{% include 'capi/_form_fields.html' %}
+<div class="form-actions"><a href="{% url 'capi:config_list' %}">Cancel</a><button class="btn">Save</button></div></form></div></div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends 'leads/base.html' %}
+{% block title %}After the conversation - {{ lead.name }}{% endblock %}
+{% block content %}
+<h1 class="page-title">After the conversation: {{ lead.name }}</h1>
+{% include 'salesai/_nav.html' %}
+<p><a href="{% url 'salesai:workspace' lead.pk %}">&larr; Workspace</a></p>
+<div class="sa-warn">Paste your own notes. The AI drafts a summary, requirements, concerns, next step and tasks - <b>only from your notes</b>. Nothing is saved to the CRM until you review and approve it.</div>
+<div class="form-card"><div class="form-card-body"><form method="post">{% csrf_token %}
+ <div class="form-row"><div class="form-group"><label class="field-label">Type</label><select name="comm_type" class="form-control">{% for v,l in comm_types %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+ <div class="form-group"><label class="field-label">When</label><input type="datetime-local" name="occurred_at" value="{{ now }}" class="form-control"></div>
+ <div class="form-group"><label class="field-label">Meeting (optional)</label><select name="meeting" class="form-control"><option value="">-</option>{% for m in meetings %}<option value="{{ m.pk }}">{{ m.title }} ({{ m.scheduled_at|date:"d M" }})</option>{% endfor %}</select></div></div>
+ <div class="form-group"><label class="field-label">Your notes *</label><textarea name="notes" rows="10" class="form-control"></textarea></div>
+ <button class="btn">Draft notes</button></form></div></div>
+{% endblock %}

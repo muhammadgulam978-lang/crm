@@ -1,0 +1,9 @@
+<table class="items-table"><thead><tr><th>When</th><th>Lead</th><th>Event</th><th>Platform</th><th>Campaign</th><th>Identifiers</th><th>Status</th><th></th></tr></thead><tbody>
+{% for e in events %}
+<tr><td>{{ e.created_at|date:"d M, H:i" }}</td><td>{{ e.lead_label }}</td><td>{{ e.event_name }}{% if e.value %}<div class="capi-muted">{{ e.value }} {{ e.currency }}</div>{% endif %}</td>
+<td>{{ e.get_platform_display }}</td><td>{{ e.campaign_name|default:"—" }}</td>
+<td class="capi-mono">{{ e.identifiers_used|join:", "|default:"—" }}</td>
+<td>{% include 'capi/_status.html' with s=e.status %}{% if e.error_message %}<div class="capi-muted">{{ e.error_message|truncatechars:60 }}</div>{% endif %}</td>
+<td><a href="{% url 'capi:event_detail' e.pk %}">Details</a></td></tr>
+{% empty %}<tr><td colspan="8" class="capi-muted" style="text-align:center">No events.</td></tr>{% endfor %}
+</tbody></table>

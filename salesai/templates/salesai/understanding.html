@@ -1,0 +1,30 @@
+{% extends 'leads/base.html' %}
+{% block title %}Customer understanding - Raabta 360{% endblock %}
+{% block content %}
+<h1 class="page-title">Customer understanding</h1>
+{% include 'salesai/_nav.html' %}
+<div class="kpi-grid">
+ <div class="kpi-card"><div class="kpi-body"><div class="kpi-value">{{ s.active_leads }}</div><div class="kpi-label">Active leads</div></div></div>
+ <div class="kpi-card green"><div class="kpi-body"><div class="kpi-value">{{ s.reviewed_leads }}</div><div class="kpi-label">Reviewed by AI</div></div></div>
+ <div class="kpi-card orange"><div class="kpi-body"><div class="kpi-value">{{ s.assumptions_pending }}</div><div class="kpi-label">Assumptions to confirm</div></div></div>
+</div>
+<p class="row-subtext" style="margin:10px 0;">Counts below use <b>verified</b> facts only (quoted from a CRM record or confirmed by a salesperson). Assumptions are never counted.</p>
+<div class="sa-grid">
+ <div class="card"><h3 class="section-heading">Repeated customer needs &amp; requirements</h3>
+ <table><tbody>{% for r in s.needs %}<tr><td>{{ r.label }}<div class="sa-ev">{% for e in r.examples %}<a href="{% url 'salesai:workspace' e.lead_id %}">{{ e.lead }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</div></td><td><b>{{ r.count }}</b> lead{{ r.count|pluralize }}</td></tr>
+ {% empty %}<tr><td class="empty-state">No verified needs yet. Run "Analyze with AI" on leads.</td></tr>{% endfor %}</tbody></table></div>
+ <div class="card"><h3 class="section-heading">Common objections</h3>
+ <table><tbody>{% for r in s.objections %}<tr><td>{{ r.label }}<div class="sa-ev">{% for e in r.examples %}<a href="{% url 'salesai:workspace' e.lead_id %}">{{ e.lead }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</div></td><td><b>{{ r.count }}</b></td></tr>
+ {% empty %}<tr><td class="empty-state">No objections recorded.</td></tr>{% endfor %}</tbody></table></div>
+ <div class="card"><h3 class="section-heading">Unanswered customer questions</h3>
+ <table><tbody>{% for f in s.unanswered %}<tr><td><a href="{% url 'salesai:workspace' f.lead_id %}">{{ f.lead.name }}</a><div class="sa-ev">{{ f.value }} &middot; {{ f.created_at|date:"d M" }}</div></td></tr>
+ {% empty %}<tr><td class="empty-state">None.</td></tr>{% endfor %}</tbody></table></div>
+ <div class="card"><h3 class="section-heading">Missing information (active leads)</h3>
+ <table><tbody>{% for k,n in s.missing.items %}<tr><td>{{ k|title }}</td><td><b>{{ n }}</b> lead{{ n|pluralize }}</td></tr>{% empty %}<tr><td class="empty-state">Nothing analysed yet.</td></tr>{% endfor %}</tbody></table></div>
+ <div class="card"><h3 class="section-heading">Competitors / current solutions</h3>
+ <table><tbody>{% for r in s.competitors %}<tr><td>{{ r.label }}</td><td><b>{{ r.count }}</b></td></tr>{% empty %}<tr><td class="empty-state">None recorded.</td></tr>{% endfor %}</tbody></table></div>
+ <div class="card"><h3 class="section-heading">Campaign results</h3>
+ <table><thead><tr><th>Campaign</th><th>Leads</th><th>Need verified</th><th>Near-term</th></tr></thead><tbody>{% for c in s.campaigns %}<tr><td>{{ c.name }}</td><td>{{ c.leads }}</td><td>{{ c.need_verified }}</td><td>{{ c.near_term }}</td></tr>
+ {% empty %}<tr><td colspan="4" class="empty-state">No campaign data.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+{% endblock %}
