@@ -7,6 +7,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Raabta 360{% endblock %}</title>
 <link rel="stylesheet" href="{% static 'css/style.css' %}">
+<link rel="stylesheet" href="{% static 'css/raabta-ui.css' %}">
+<script>window.RB_CUR="{{ currency|default:'$' }}";window.RB_MAP_URL="{% static 'js/world-dots.json' %}";</script>
+<script src="{% static 'js/raabta-charts.js' %}"></script>
 </head>
 <body>
 
@@ -20,23 +23,10 @@
     <aside class="sidebar">
         <button type="button" class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close menu">&#10005;</button>
 
-        <div class="brand" style="display:flex; justify-content:center; padding: 20px 0;">
-            <div style="
-                width: 140px;
-                height: 140px;
-                border-radius: 20px;
-                overflow: hidden;
-                -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%);
-                mask-image: radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%);
-            ">
-                <img src="{% static 'images/logo1.png' %}"
-                    alt="Logo"
-                    style="width:100% !important; height:100% !important; object-fit:cover !important; display:block !important;">
-            </div>
+        <div class="rb-brand">
+            <img src="{% static 'images/logo1.png' %}" alt="Raabta 360">
+            <div><b>Raabta 360</b><small>CRM</small></div>
         </div>
-        <!-- <div class="brand">Rabta CRM</div> -->
-         <div class="brand" style="text-align: center;">Rabta CRM</div>
-
 
         <!-- MENU -->
         <nav>
@@ -592,17 +582,32 @@
             </a>
         </nav>
         {% endif %}
+        <div style="flex:1"></div>
+        <div class="rb-upgrade">
+            <b>Upgrade to Pro</b>
+            <p>Unlock advanced insights, automation and more.</p>
+            <a href="#">Upgrade Now &rarr;</a>
+        </div>
+        <div class="rb-sidefoot"><img src="{% static 'images/logo1.png' %}" alt=""><div>Raabta 360 <small>v2.0.0</small></div></div>
     </aside>
 
     <main class="main">
         <div class="topbar">
-            <div style="flex:1;"></div>
-            <a href="{% url 'notification_list' %}" class="notif-bell">
-                &#128276;
-                {% if sidebar_counts.unread_notifications > 0 %}
-                <span class="notif-count">{{ sidebar_counts.unread_notifications }}</span>
-                {% endif %}
-            </a>
+            <form class="rb-search" action="{% url 'all_leads' %}" method="get">
+                <span>&#128269;</span>
+                <input type="text" name="q" placeholder="Search leads, deals, contacts, companies..." value="{{ request.GET.q|default:'' }}">
+            </form>
+            <div class="rb-top-right">
+                <a href="{% url 'notification_list' %}" class="notif-bell" title="Notifications">
+                    &#128276;
+                    {% if sidebar_counts.unread_notifications > 0 %}<span class="notif-count">{{ sidebar_counts.unread_notifications }}</span>{% endif %}
+                </a>
+                <a href="{% url 'calendar_view' %}" class="notif-bell" title="Calendar">&#128197;</a>
+                <div class="rb-user">
+                    <div class="rb-avatar">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</div>
+                    <div><b>{{ user.get_full_name|default:user.username }}</b><small>{% if user.is_superuser %}Admin{% else %}{{ user.profile.get_role_display|default:"User" }}{% endif %}</small></div>
+                </div>
+            </div>
         </div>
 
         {% if messages %}

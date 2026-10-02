@@ -1,284 +1,124 @@
 {% extends 'leads/base.html' %}
-{% block title %}CEO Dashboard - Lead CRM{% endblock %}
+{% block title %}CEO Dashboard - Raabta 360{% endblock %}
 {% block content %}
-
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-    <h1 class="page-title" style="margin:0;">👑 CEO Dashboard</h1>
-    <div style="font-size:13px; color:var(--text-muted);">
-        Live data · Updated now
+<div class="rb-head">
+    <div>
+        <h1>CEO Dashboard</h1>
+        <p>Executive view of your business performance and key metrics.</p>
+    </div>
+    <div class="rb-actions">
+        <span class="rb-btn">&#128197; Last 30 days</span>
+        <a class="rb-btn" href="{% url 'reports' %}">Export Report</a>
     </div>
 </div>
 
-<!-- Revenue KPIs -->
-<div class="report-grid">
-    <div class="kpi-card green">
-        <div class="kpi-label">Total Revenue</div>
-        <div class="kpi-value">{{ total_revenue }}</div>
-        <div class="kpi-sub">all time</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-label">This Month Revenue</div>
-        <div class="kpi-value">{{ this_month_revenue }}</div>
-        <div class="kpi-sub">so far this month</div>
-    </div>
-    <div class="kpi-card purple">
-        <div class="kpi-label">Pipeline Value</div>
-        <div class="kpi-value">{{ pipeline_value }}</div>
-        <div class="kpi-sub">active deals</div>
-    </div>
-    <div class="kpi-card orange">
-        <div class="kpi-label">Conversion Rate</div>
-        <div class="kpi-value">{{ conversion_rate }}%</div>
-        <div class="kpi-sub">leads to customers</div>
-    </div>
-</div>
-
-<!-- Activity Alerts -->
-<div class="report-grid">
-    <div class="kpi-card {% if meetings_today > 0 %}{% else %}red{% endif %}">
-        <div class="kpi-label">Meetings Today</div>
-        <div class="kpi-value">{{ meetings_today }}</div>
-    </div>
-    <div class="kpi-card {% if followups_today > 0 %}orange{% endif %}">
-        <div class="kpi-label">Followups Due Today</div>
-        <div class="kpi-value">{{ followups_today }}</div>
-    </div>
-    <div class="kpi-card {% if tasks_overdue > 0 %}red{% endif %}">
-        <div class="kpi-label">Overdue Tasks</div>
-        <div class="kpi-value">{{ tasks_overdue }}</div>
-    </div>
-    <div class="kpi-card {% if tickets_open > 0 %}orange{% endif %}">
-        <div class="kpi-label">Open Tickets</div>
-        <div class="kpi-value">{{ tickets_open }}</div>
-    </div>
-</div>
-
-<!-- Pipeline Summary + AI Forecast -->
-<div class="report-row">
-    <div class="card">
-        <h2 class="section-heading">Pipeline Summary</h2>
-        <div class="bar-chart">
-            <div class="bar-row">
-                <div class="bar-label">New</div>
-                <div class="bar-track">
-                    <div class="bar-fill blue"
-                         style="width:{% if total_leads %}{% widthratio new_leads total_leads 100 %}{% else %}0{% endif %}%">
-                    </div>
-                </div>
-                <div class="bar-count">{{ new_leads }}</div>
-            </div>
-            <div class="bar-row">
-                <div class="bar-label">Positive</div>
-                <div class="bar-track">
-                    <div class="bar-fill purple"
-                         style="width:{% if total_leads %}{% widthratio positive_leads total_leads 100 %}{% else %}0{% endif %}%">
-                    </div>
-                </div>
-                <div class="bar-count">{{ positive_leads }}</div>
-            </div>
-            <div class="bar-row">
-                <div class="bar-label">Quotation</div>
-                <div class="bar-track">
-                    <div class="bar-fill orange"
-                         style="width:{% if total_leads %}{% widthratio quotation_leads total_leads 100 %}{% else %}0{% endif %}%">
-                    </div>
-                </div>
-                <div class="bar-count">{{ quotation_leads }}</div>
-            </div>
-            <div class="bar-row">
-                <div class="bar-label">Converted</div>
-                <div class="bar-track">
-                    <div class="bar-fill green"
-                         style="width:{% if total_leads %}{% widthratio converted_leads total_leads 100 %}{% else %}0{% endif %}%">
-                    </div>
-                </div>
-                <div class="bar-count">{{ converted_leads }}</div>
-            </div>
-            <div class="bar-row">
-                <div class="bar-label">Lost</div>
-                <div class="bar-track">
-                    <div class="bar-fill red"
-                         style="width:{% if total_leads %}{% widthratio lost_leads total_leads 100 %}{% else %}0{% endif %}%">
-                    </div>
-                </div>
-                <div class="bar-count">{{ lost_leads }}</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2 class="section-heading">📈 AI Revenue Forecast</h2>
-        {% if forecast.error %}
-        <div class="empty-state">{{ forecast.error }}</div>
-        {% else %}
-        <div style="margin-bottom:16px;">
-            <div style="font-size:13px; color:var(--text-muted); margin-bottom:4px;">
-                Predicted Next Month Revenue
-            </div>
-            <div style="font-size:28px; font-weight:700; color:var(--teal-dark);">
-                {{ forecast.revenue_min }} – {{ forecast.revenue_max }}
-            </div>
-        </div>
-        <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
-            <div>
-                <div style="font-size:12px; color:var(--text-muted);">Expected Conversions</div>
-                <div style="font-size:20px; font-weight:700;">{{ forecast.expected_conversions }}</div>
-            </div>
-            <div>
-                <div style="font-size:12px; color:var(--text-muted);">Pipeline Health</div>
-                <div style="font-size:16px; font-weight:700;
-                    color:{% if forecast.pipeline_health == 'Excellent' %}var(--green)
-                    {% elif forecast.pipeline_health == 'Good' %}var(--teal)
-                    {% elif forecast.pipeline_health == 'Fair' %}var(--orange)
-                    {% else %}var(--red){% endif %};">
-                    {{ forecast.pipeline_health }}
-                </div>
-            </div>
-        </div>
-        {% if forecast.summary %}
-        <p style="font-size:13px; color:var(--text-muted);">{{ forecast.summary }}</p>
-        {% endif %}
-        <a href="{% url 'sales_forecast' %}" class="btn btn-small" style="margin-top:8px;">
-            Full Forecast →
-        </a>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Team Performance -->
-<div class="card">
-    <h2 class="section-heading">👥 Team Performance</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Sales Person</th>
-                <th>Total Leads</th>
-                <th>Converted</th>
-                <th>Conversion Rate</th>
-                <th>Revenue Generated</th>
-                <th>Performance</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for spo in spo_performance %}
-            <tr>
-                <td><strong>{{ spo.name }}</strong></td>
-                <td>{{ spo.total }}</td>
-                <td style="color:var(--green); font-weight:700;">{{ spo.converted }}</td>
-                <td>{{ spo.rate }}%</td>
-                <td style="font-weight:700;">{{ spo.revenue }}</td>
-                <td style="min-width:120px;">
-                    <div class="progress-bar-wrap" style="height:10px;">
-                        <div class="progress-bar-fill done"
-                             style="width:{{ spo.rate }}%">
-                        </div>
-                    </div>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="6" class="empty-state">
-                    No sales persons yet.
-                    <a href="{% url 'salesperson_create' %}">Add one →</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<!-- Top Scored Leads + High Churn Risk side by side -->
-<div class="report-row">
-    <div class="card">
-        <h2 class="section-heading">🏆 Top Scored Leads</h2>
-        <table>
-            <thead>
-                <tr><th>Lead</th><th>Score</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-                {% for lead in top_leads %}
-                <tr>
-                    <td>
-                        <a href="{% url 'lead_detail' lead.pk %}">{{ lead.name }}</a>
-                    </td>
-                    <td>
-                        <span style="font-weight:700;
-                            color:{% if lead.ai_score >= 80 %}var(--green)
-                            {% elif lead.ai_score >= 60 %}#2196f3
-                            {% elif lead.ai_score >= 40 %}var(--orange)
-                            {% else %}var(--red){% endif %};">
-                            {{ lead.ai_score }}/100
-                        </span>
-                    </td>
-                    <td>
-                        <span class="pill pill-{{ lead.status }}">
-                            {{ lead.get_status_display }}
-                        </span>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="3" class="empty-state">
-                        No scored leads yet.
-                        <a href="{% url 'score_all_leads' %}">Score all →</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <div class="card">
-        <h2 class="section-heading">⚠️ High Churn Risk</h2>
-        <table>
-            <thead>
-                <tr><th>Lead</th><th>SPO</th><th>Risk</th></tr>
-            </thead>
-            <tbody>
-                {% for lead in high_churn_leads %}
-                <tr>
-                    <td>
-                        <a href="{% url 'lead_detail' lead.pk %}">{{ lead.name }}</a>
-                    </td>
-                    <td>{{ lead.spo.name|default:"Unassigned" }}</td>
-                    <td><span class="pill pill-lost">High</span></td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="3" class="empty-state">No high risk leads.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% if high_churn_leads %}
-        <div style="margin-top:12px;">
-            <a href="{% url 'churn_risk_all' %}" class="btn btn-small">
-                View All Churn Risk →
-            </a>
-        </div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- AI Recommendations -->
-{% if forecast.recommendations %}
-<div class="card">
-    <h2 class="section-heading">🤖 AI Business Recommendations</h2>
-    {% for rec in forecast.recommendations %}
-    <div style="display:flex; gap:12px; align-items:flex-start;
-                padding:12px 0; border-bottom:1px solid var(--border);">
-        <span style="background:var(--teal); color:#fff; border-radius:50%;
-                     width:28px; height:28px; display:flex; align-items:center;
-                     justify-content:center; font-size:13px; font-weight:700;
-                     flex-shrink:0;">
-            {{ forloop.counter }}
-        </span>
-        <span style="font-size:14px; color:var(--text-dark); padding-top:4px;">
-            {{ rec }}
-        </span>
+<div class="rb-grid g4">
+    {% for k in ceo_kpis %}
+    <div class="rb-card rb-kpi">
+        <div class="ic {{ k.tone }}">{{ k.icon|safe }}</div>
+        <div><small>{{ k.label }}</small><div class="v">{{ k.value }}</div>
+            <div class="d {% if not k.ch.up %}down{% endif %}">{% if k.ch.up %}&#8593;{% else %}&#8595;{% endif %} {{ k.ch.pct }}%<i>vs last month</i></div></div>
     </div>
     {% endfor %}
+    <div class="rb-card rb-kpi">
+        <div class="ic orange">&#127942;</div>
+        <div><small>Win Rate</small><div class="v">{{ win_rate }}%</div>
+            <div class="d {% if not win_ch.up %}down{% endif %}">{% if win_ch.up %}&#8593;{% else %}&#8595;{% endif %} {{ win_ch.pct }}%<i>vs last month</i></div></div>
+        <div class="rb-ring" id="winRing"></div>
+    </div>
 </div>
-{% endif %}
 
+<div class="rb-grid g-ceo">
+    <div class="rb-card">
+        <h3>Revenue Overview
+            <span style="display:flex;gap:12px;font:500 11px Inter;color:var(--rb-muted)">
+                <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1f6bff"></i> Revenue</span>
+                <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#12b76a"></i> Deals Won</span>
+                <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f04438"></i> Deals Lost</span></span>
+        </h3>
+        <div id="ceoLine"></div>
+    </div>
+    <div class="rb-card"><h3>Sales Pipeline</h3><div id="ceoFunnel"></div></div>
+    <div class="rb-card">
+        <h3>Top Performing Sales Persons <a href="{% url 'salesperson_list' %}">View All</a></h3>
+        <table class="rb-table">
+            <thead><tr><th>#</th><th>Sales Person</th><th>Revenue</th><th>Deals</th><th>Win Rate</th></tr></thead>
+            <tbody>
+            {% for p in top_people %}
+            <tr><td>{{ forloop.counter }}</td>
+                <td><div class="rb-person"><span class="rb-avatar">{{ p.initials }}</span>{{ p.name }}</div></td>
+                <td>{{ currency }}{{ p.revenue|floatformat:"0g" }}</td><td>{{ p.deals }}</td>
+                <td><div style="display:flex;align-items:center;gap:6px"><span>{{ p.rate }}%</span><div class="rb-mini-bar" style="flex:1"><i style="width:{{ p.rate }}%"></i></div></div></td></tr>
+            {% empty %}<tr><td colspan="5" class="rb-empty">No sales persons yet.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="rb-grid" style="grid-template-columns:1.9fr 1fr">
+    <div class="rb-card">
+        <h3>Recent Highlights</h3>
+        <div class="rb-hl">
+            <div><small>Highest Single Deal</small><div class="v" style="font-size:15px">{{ highlights.best_name }}</div><div class="v" style="margin-top:0">{{ currency }}{{ highlights.best_value|floatformat:"0g" }}</div></div>
+            <div><small>New Customers</small><div class="v">{{ highlights.new_customers }}</div>
+                <div class="d rb-kpi" style="display:block"><span class="d {% if not highlights.new_customers_ch.up %}down{% endif %}" style="font-size:11px;font-weight:600;color:{% if highlights.new_customers_ch.up %}var(--rb-green){% else %}var(--rb-red){% endif %}">{% if highlights.new_customers_ch.up %}&#8593;{% else %}&#8595;{% endif %} {{ highlights.new_customers_ch.pct }}%</span> <span class="s">vs last month</span></div></div>
+            <div><small>Pipeline Growth</small><div class="v">{% if highlights.pipe_growth.up %}+{% else %}-{% endif %}{{ highlights.pipe_growth.pct|floatformat:"0g" }}%</div><div class="s">vs last month</div></div>
+            <div><small>Customer Satisfaction</small><div class="v">{{ highlights.satisfaction }}%</div><div class="s">tickets resolved</div></div>
+        </div>
+    </div>
+    <div class="rb-card rb-quote">
+        <q>Great leaders don't just track numbers, they build what's next.</q><hr>
+        <svg viewBox="0 0 100 70" style="position:absolute;right:16px;bottom:12px;width:90px;opacity:.35"><g fill="#fff"><rect x="8" y="40" width="14" height="28" rx="3"/><rect x="32" y="28" width="14" height="40" rx="3"/><rect x="56" y="16" width="14" height="52" rx="3"/><rect x="80" y="4" width="14" height="64" rx="3"/></g></svg>
+    </div>
+</div>
+
+<!-- AI insights (existing CRM intelligence retained) -->
+<div class="rb-grid g-eq3">
+    <div class="rb-card">
+        <h3>AI Sales Forecast</h3>
+        {% if forecast.error %}<div class="rb-empty">{{ forecast.error }}</div>{% else %}
+        <div style="font:700 20px Poppins">{{ forecast.revenue_min }} – {{ forecast.revenue_max }}</div>
+        <p style="font-size:12px;color:var(--rb-muted)">Expected conversions: <b>{{ forecast.expected_conversions }}</b> · Pipeline health: <b>{{ forecast.pipeline_health }}</b></p>
+        {% if forecast.summary %}<p style="font-size:12px;color:var(--rb-muted)">{{ forecast.summary }}</p>{% endif %}{% endif %}
+    </div>
+    <div class="rb-card">
+        <h3>Top AI-Scored Leads</h3>
+        <table class="rb-table"><tbody>
+        {% for lead in top_leads %}<tr><td><a class="rb-link" href="{% url 'lead_detail' lead.pk %}">{{ lead.name }}</a></td><td><span class="rb-pill p-{{ lead.status }}">{{ lead.get_status_display }}</span></td><td><b>{{ lead.ai_score }}</b>/100</td></tr>
+        {% empty %}<tr><td class="rb-empty">No scored leads yet.</td></tr>{% endfor %}</tbody></table>
+    </div>
+    <div class="rb-card">
+        <h3>Churn Alerts &amp; Today</h3>
+        <table class="rb-table"><tbody>
+        {% for lead in high_churn_leads %}<tr><td><a class="rb-link" href="{% url 'lead_detail' lead.pk %}">{{ lead.name }}</a></td><td>{{ lead.spo.name|default:"Unassigned" }}</td><td><span class="rb-pill p-lost">High risk</span></td></tr>
+        {% empty %}<tr><td class="rb-empty">No churn alerts.</td></tr>{% endfor %}</tbody></table>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--rb-muted)">
+            <span>Meetings today: <b>{{ meetings_today }}</b></span><span>Overdue tasks: <b>{{ tasks_overdue }}</b></span><span>Open tickets: <b>{{ tickets_open }}</b></span><span>Follow-ups today: <b>{{ followups_today }}</b></span>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+  RB.ring('winRing',{{ win_rate }});
+  var d={{ deals_json|safe }};
+  var mx=Math.max.apply(null,d.won.concat(d.lost,[1]));
+  /* Deals are on a small scale; plot all three on one normalized axis, tooltip shows real values */
+  var rmax=Math.max.apply(null,d.revenue.concat([1]));
+  function norm(a,m){return a.map(function(v){return v/m*rmax})}
+  var wn=norm(d.won,Math.max(mx,1)),ln=norm(d.lost,Math.max(mx,1));
+  RB.line('ceoLine',{labels:d.labels,height:250,series:[
+    {name:'Revenue',color:'#1f6bff',data:d.revenue,area:true},
+    {name:'Deals Won',color:'#12b76a',data:wn,dots:true},
+    {name:'Deals Lost',color:'#f04438',data:ln,dots:true}],
+    tipfmt:function(v){return v}});
+  /* overwrite tooltip with real numbers */
+  var el=document.getElementById('ceoLine');
+  el.querySelector('rect:last-of-type').addEventListener('mousemove',function(){
+    var t=el.querySelector('.ch-tip'),lab=(t.querySelector('small')||{}).textContent,i=d.labels.indexOf(lab);if(i<0)return;
+    t.innerHTML='Revenue: '+RB.money(d.revenue[i])+'<br>Deals Won: '+d.won[i]+'<br>Deals Lost: '+d.lost[i]+'<small>'+lab+'</small>'});
+  var f={{ funnel_json|safe }}, useMoney=f.some(function(x){return x.amount>0});
+  RB.funnel('ceoFunnel',f.map(function(x){return {label:x.label,value:useMoney?x.amount:x.value,color:x.color,color2:x.color2}}),{money:useMoney});
+})();
+</script>
 {% endblock %}

@@ -1,0 +1,10 @@
+{% for k in kpis %}
+<div class="rb-card rb-kpi">
+    <div class="ic {{ k.tone }}">{{ k.icon|safe }}</div>
+    <div>
+        <small>{{ k.label }}</small>
+        <div class="v">{{ k.value }}</div>
+        <div class="d {% if not k.ch.up %}down{% endif %}">{% if k.ch.up %}&#8593;{% else %}&#8595;{% endif %} {{ k.ch.pct }}%<i>vs last period</i></div>
+    </div>
+</div>
+{% endfor %}

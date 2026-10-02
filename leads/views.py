@@ -62,6 +62,13 @@ from .models import Lead, CallLog, CallSchedule, GoogleCredential
 from django.core.paginator import Paginator
 
 
+import markdown
+from django.http import HttpResponse
+from django.utils.html import escape
+from django.utils.text import slugify
+from xhtml2pdf import pisa
+
+
 from .models import (Lead, FollowUp, SalesPerson, Payment,
                      ScheduledPayment, Installment, UserProfile,
                      Company, Contact, Opportunity,
@@ -111,9 +118,16 @@ def logout_view(request):
 
 @login_required
 def dashboard(request):
-    leads = Lead.objects.all()
-    today = timezone.localdate()
+    from . import dashboard_data as dd
+    try:
+        days = int(request.GET.get('days', 7))
+    except (TypeError, ValueError):
+        days = 7
+    if days not in (7, 30, 90):
+        days = 7
+    start, end, _ps, _pe = dd.window(days)
 
+    leads = Lead.objects.all()
     stats = {
         'total': leads.count(),
         'new': leads.filter(status='new').count(),
@@ -122,62 +136,20 @@ def dashboard(request):
         'quotation': leads.filter(status='quotation').count(),
         'convert': leads.filter(status='converted').count(),
     }
-
-    # Monthly lead trend (last 6 months) for histogram/bar chart
-    from django.db.models import Count
-
-    month_labels = []
-    month_counts = []
-    for i in range(5, -1, -1):
-        y, m = today.year, today.month - i
-        while m <= 0:
-            m += 12
-            y -= 1
-        count = leads.filter(created_at__year=y, created_at__month=m).count()
-        month_labels.append(f"{calendar.month_abbr[m]} {y}")
-        month_counts.append(count)
-
-    # Source breakdown for pie chart
-    from .models import LEAD_SOURCE_CHOICES
-    source_counts_qs = leads.values('lead_source').annotate(c=Count('id')).order_by('-c')
-    source_labels = []
-    source_counts = []
-    source_display_map = dict(LEAD_SOURCE_CHOICES)
-    for row in source_counts_qs:
-        source_labels.append(source_display_map.get(row['lead_source'], row['lead_source'] or 'Unknown'))
-        source_counts.append(row['c'])
-
-    followups = FollowUp.objects.all()
-    followup_stats = {
-        'today': followups.filter(status='pending', follow_up_date__date=today).count(),
-        'next': followups.filter(status='pending', follow_up_date__date__gt=today).count(),
-        'pending': followups.filter(status='pending').count(),
-        'done': followups.filter(status='done').count(),
-    }
-
-    spo_rows = []
-    for spo in SalesPerson.objects.all():
-        spo_leads = Lead.objects.filter(spo=spo)
-        spo_rows.append({
-            'name': spo.name,
-            'total': spo_leads.count(),
-            'new': spo_leads.filter(status='new').count(),
-            'assign': spo_leads.exclude(status='new').count(),
-            'positive': spo_leads.filter(status='positive').count(),
-            'lost': spo_leads.filter(status='lost').count(),
-            'quotation': spo_leads.filter(status='quotation').count(),
-            'convert': spo_leads.filter(status='converted').count(),
-        })
-
+    sources = dd.source_breakdown()
     context = {
-        'stats': stats,
-        'followup_stats': followup_stats,
-        'spo_rows': spo_rows,
         'active': 'dashboard',
-        'month_labels': json.dumps(month_labels),
-        'month_counts': json.dumps(month_counts),
-        'source_labels': json.dumps(source_labels),
-        'source_counts': json.dumps(source_counts),
+        'stats': stats,
+        'days': days,
+        'range_label': f"{start.strftime('%b %d, %Y')} - {end.strftime('%b %d, %Y')}",
+        'kpis': dd.kpis_dashboard(days),
+        'sources': sources,
+        'sources_json': json.dumps(sources),
+        'funnel_json': json.dumps(dd.opp_funnel()),
+        'revenue_json': json.dumps(dd.revenue_series()),
+        'activities': dd.recent_activities(5),
+        'meetings': dd.upcoming_meetings(4),
+        'currency': dd.CURRENCY,
     }
     return render(request, 'leads/dashboard.html', context)
 
@@ -689,56 +661,64 @@ def bulk_import_leads(request):
 
 @login_required
 def lead_list(request, status=None):
-    leads = Lead.objects.all()
-    title = 'All Leads'
+    from . import dashboard_data as dd
+    leads = Lead.objects.select_related('spo').all()
+    title = 'Leads'
     active = 'all_leads'
 
     if status:
         leads = leads.filter(status=status)
-        title = dict(
-            Lead._meta.get_field('status').choices
-        ).get(status, status.title())
+        title = dict(Lead._meta.get_field('status').choices).get(status, status.title())
         active = status
 
-    # Existing search
     q = request.GET.get('q')
     if q:
-        leads = leads.filter(
-            Q(name__icontains=q) |
-            Q(contact_number__icontains=q) |
-            Q(email__icontains=q)
-        )
+        leads = leads.filter(Q(name__icontains=q) | Q(contact_number__icontains=q) | Q(email__icontains=q))
 
-    # New filters
     source = request.GET.get('source')
     spo = request.GET.get('spo')
     score = request.GET.get('score')
+    st = request.GET.get('status')
+    d_from = request.GET.get('date_from')
+    d_to = request.GET.get('date_to')
 
     if source:
         leads = leads.filter(lead_source=source)
-
     if spo:
         leads = leads.filter(spo_id=spo)
-
+    if st and not status:
+        leads = leads.filter(status=st)
+    if d_from:
+        leads = leads.filter(created_at__date__gte=d_from)
+    if d_to:
+        leads = leads.filter(created_at__date__lte=d_to)
     if score == 'high':
         leads = leads.order_by('-ai_score')
-
     elif score == 'low':
         leads = leads.order_by('ai_score')
+    else:
+        leads = leads.order_by('-created_at')
+
+    paginator = Paginator(leads, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    qs = request.GET.copy()
+    qs.pop('page', None)
 
     context = {
-    'leads': leads,
-    'title': title,
-    'active': active,
-    'lead_sources': LEAD_SOURCE_CHOICES,
-    'spos': SalesPerson.objects.all(),
+        'leads': page_obj,
+        'page_obj': page_obj,
+        'total_found': paginator.count,
+        'querystring': qs.urlencode(),
+        'title': title,
+        'active': active,
+        'tiles': dd.lead_tiles(),
+        'lead_sources': LEAD_SOURCE_CHOICES,
+        'lead_statuses': Lead._meta.get_field('status').choices,
+        'spos': SalesPerson.objects.all(),
+        'current_status': status or '',
+        'range_label': timezone.localdate().strftime('%b %d, %Y'),
     }
-
-    return render(
-        request,
-        'leads/lead_list.html',
-        context
-    )
+    return render(request, 'leads/lead_list.html', context)
 
 @login_required
 @block_view_only
@@ -2349,6 +2329,22 @@ def reports(request):
         'followup_done': followup_done,
         'followup_pending': followup_pending,
     }
+    from . import dashboard_data as dd
+    srcs = dd.source_breakdown(top=4)
+    regs = dd.regions(4)
+    context.update({
+        'currency': dd.CURRENCY,
+        'a_kpis': dd.kpis_analytics(),
+        'a_sources': srcs,
+        'a_sources_json': json.dumps(srcs),
+        'a_perf_json': json.dumps(dd.monthly_performance(12)),
+        'a_funnel_json': json.dumps(dd.lead_funnel()),
+        'a_has_target': bool(dd.monthly_performance(1)['target']),
+        'a_regions': regs,
+        'a_regions_json': json.dumps(regs),
+        'a_top_deals': dd.top_deals(5),
+        'range_label': f"{(today - timedelta(days=29)).strftime('%b %d, %Y')} - {today.strftime('%b %d, %Y')}",
+    })
     return render(request, 'leads/reports.html', context)
 
 # ── SUPPORT TICKET VIEWS ───────────────────────────────────
@@ -3198,6 +3194,44 @@ def ceo_dashboard(request):
         'tickets_open': tickets_open,
         'followups_today': followups_today,
     }
+    from . import dashboard_data as dd
+    from django.db.models import Max
+    s30, e30, ps30, pe30 = dd.window(30)
+    rev_cur = dd._rev(s30, e30)
+    rev_prev = dd._rev(ps30, pe30)
+    deals_cur = Lead.objects.filter(status='converted', updated_at__date__gte=s30).count()
+    deals_prev = Lead.objects.filter(status='converted', updated_at__date__gte=ps30, updated_at__date__lte=pe30).count()
+    pipe_cur = float(Opportunity.objects.exclude(stage__in=['won', 'lost']).aggregate(t=Sum('value'))['t'] or 0) or float(pipeline_value or 0)
+    pipe_new = float(Opportunity.objects.filter(created_at__date__gte=s30).aggregate(t=Sum('value'))['t'] or 0)
+    pipe_old = float(Opportunity.objects.filter(created_at__date__gte=ps30, created_at__date__lte=pe30).aggregate(t=Sum('value'))['t'] or 0)
+    won_o = Opportunity.objects.filter(stage='won').count()
+    lost_o = Opportunity.objects.filter(stage='lost').count()
+    win_rate = round(won_o / (won_o + lost_o) * 100) if (won_o + lost_o) else round(conversion_rate)
+    best = Lead.objects.filter(status='converted').order_by('-quotation').first()
+    tk_total = Ticket.objects.count()
+    tk_done = Ticket.objects.filter(status__in=['resolved', 'closed']).count()
+    context.update({
+        'currency': dd.CURRENCY,
+        'ceo_kpis': [
+            {'label': 'Total Revenue', 'value': f"{dd.CURRENCY}{float(total_revenue):,.0f}", 'icon': '&#128101;', 'tone': 'blue', 'ch': dd.change(rev_cur, rev_prev)},
+            {'label': 'Total Deals', 'value': f"{Lead.objects.filter(status='converted').count():,}", 'icon': '&#128196;', 'tone': 'cyan', 'ch': dd.change(deals_cur, deals_prev)},
+            {'label': 'Pipeline Value', 'value': f"{dd.CURRENCY}{pipe_cur:,.0f}", 'icon': '&#128188;', 'tone': 'purple', 'ch': dd.change(pipe_new, pipe_old)},
+        ],
+        'win_rate': win_rate,
+        'win_ch': dd.change(deals_cur, deals_prev),
+        'deals_json': json.dumps(dd.deals_series(8)),
+        'funnel_json': json.dumps(dd.opp_funnel()),
+        'top_people': dd.top_sales_people(5),
+        'highlights': {
+            'best_name': best.name if best else '—',
+            'best_value': float(best.quotation) if best else 0,
+            'new_customers': Lead.objects.filter(status='converted', updated_at__date__gte=s30).count(),
+            'new_customers_ch': dd.change(deals_cur, deals_prev),
+            'pipe_growth': dd.change(pipe_new, pipe_old),
+            'pipe_growth_pct': round((pipe_new - pipe_old) / pipe_old * 100) if pipe_old else (100 if pipe_new else 0),
+            'satisfaction': round(tk_done / tk_total * 100) if tk_total else 0,
+        },
+    })
     return render(request, 'leads/ceo_dashboard.html', context)
 
 
@@ -3205,44 +3239,54 @@ def ceo_dashboard(request):
 
 @login_required
 def proposal_writer(request, lead_pk=None):
-    """
-    Main proposal writer page.
-    Accepts optional lead_pk to pre-link the proposal to a lead.
-    """
     lead = None
     if lead_pk:
         lead = get_object_or_404(Lead, pk=lead_pk)
 
     if request.method == 'POST':
+        mode = request.POST.get('mode', 'ai')          # 'ai' ya 'manual'
         title = request.POST.get('title', 'Business Proposal')
         manual_notes = request.POST.get('manual_notes', '')
+        manual_content = request.POST.get('manual_content', '').strip()
         pdf_file = request.FILES.get('pdf_file')
         lead_id = request.POST.get('lead_id')
 
         if lead_id:
             lead = Lead.objects.filter(pk=lead_id).first()
 
-        # create proposal record
+        # ---- validation ----
+        if mode == 'ai' and not manual_notes.strip() and not pdf_file:
+            messages.error(request, 'AI ke liye PDF ya notes (ya dono) dena zaroori hai.')
+            return redirect(request.path)
+        if mode == 'manual' and not manual_content:
+            messages.error(request, 'Please proposal ka text likhein.')
+            return redirect(request.path)
+
         proposal = Proposal(
             title=title,
             lead=lead,
-            manual_notes=manual_notes,
             created_by=request.user,
             status='draft',
         )
 
-        # handle PDF upload and extraction
+        # ---------- WITHOUT AI ----------
+        if mode == 'manual':
+            proposal.generated_proposal = manual_content
+            proposal.status = 'generated'
+            proposal.save()
+            return redirect('proposal_detail', pk=proposal.pk)
+
+        # ---------- WITH AI ----------
+        proposal.manual_notes = manual_notes
         pdf_text = ''
         if pdf_file:
             proposal.uploaded_pdf = pdf_file
-            proposal.save()  # save to disk first
-            pdf_path = proposal.uploaded_pdf.path
-            pdf_text = extract_pdf_text(pdf_path)
+            proposal.save()
+            pdf_text = extract_pdf_text(proposal.uploaded_pdf.path)
             proposal.pdf_extracted_text = pdf_text
         else:
             proposal.save()
 
-        # build lead context for AI
         lead_context = None
         if lead:
             lead_context = {
@@ -3253,27 +3297,50 @@ def proposal_writer(request, lead_pk=None):
                 'source': lead.get_lead_source_display(),
             }
 
-        # generate proposal with Groq
-        generated_text = generate_proposal(
+        proposal.generated_proposal = generate_proposal(
             manual_notes=manual_notes,
             pdf_text=pdf_text,
             lead_context=lead_context,
         )
-
-        proposal.generated_proposal = generated_text
         proposal.status = 'generated'
         proposal.save()
-
         return redirect('proposal_detail', pk=proposal.pk)
 
     context = {
         'lead': lead,
         'leads': Lead.objects.all(),
         'active': 'proposals',
-        'title': 'AI Proposal Writer',
+        'title': 'Proposal Writer',
     }
     return render(request, 'leads/proposal_writer.html', context)
 
+@login_required
+def proposal_download_pdf(request, pk):
+    proposal = get_object_or_404(Proposal, pk=pk)
+    body_html = markdown.markdown(
+        proposal.generated_proposal or '',
+        extensions=['tables', 'fenced_code'],
+    )
+    html = f"""
+    <html><head><meta charset="utf-8">
+    <style>
+        @page {{ size: A4; margin: 2cm; }}
+        body {{ font-family: Helvetica; font-size: 12px; line-height: 1.6; color: #222; }}
+        h1 {{ color: #1a3a6b; font-size: 22px; }}
+        h2 {{ color: #1a3a6b; font-size: 17px; }}
+        h3 {{ color: #1a3a6b; font-size: 14px; }}
+        table {{ border-collapse: collapse; width: 100%; }}
+        th, td {{ border: 1px solid #999; padding: 5px; }}
+    </style></head>
+    <body><h1>{escape(proposal.title)}</h1>{body_html}</body></html>
+    """
+    response = HttpResponse(content_type='application/pdf')
+    filename = slugify(proposal.title) or 'proposal'
+    response['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
+    status = pisa.CreatePDF(html, dest=response)
+    if status.err:
+        return HttpResponse('PDF banane me error aaya.', status=500)
+    return response
 
 @login_required
 def proposal_detail(request, pk):
@@ -3655,11 +3722,6 @@ def recording_callback(request):
 # ============================================================
 # 2. WHATSAPP CALLING (Meta Cloud API)
 # ============================================================
-# Real WhatsApp voice calls via Meta's Cloud API use WebRTC. The backend below
-# initiates/manages the call session; actual audio requires an SDP offer from a
-# WebRTC-capable client (browser mic/speaker access), which then gets relayed
-# through these endpoints. This is NOT optional plumbing — without a WebRTC
-# frontend, the call session can open but no audio will flow.
 
 META_GRAPH_URL = f"https://graph.facebook.com/{settings.META_WA_API_VERSION}/{settings.META_WA_PHONE_NUMBER_ID}/calls"
 

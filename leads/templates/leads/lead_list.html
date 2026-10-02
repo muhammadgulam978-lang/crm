@@ -2,95 +2,101 @@
 {% load custom_filters %}
 {% block title %}{{ title }} - Raabta 360{% endblock %}
 {% block content %}
-<div class="list-header">
-    <h1 class="page-title">{{ title }}</h1>
-    {% if request.user|has_full_access:'leads' %}
-    <a href="{% url 'create_lead' %}" class="btn">+ New Lead</a>
-    {% endif %}
+<div class="rb-head">
+    <div>
+        <h1>{{ title }}</h1>
+        <p>Manage and track all your leads in one place.</p>
+    </div>
+    <div class="rb-actions">
+        <span class="rb-btn">&#128197; {{ range_label }}</span>
+        {% if request.user|has_full_access:'leads' %}<a href="{% url 'create_lead' %}" class="rb-btn primary">+ Add Lead</a>{% endif %}
+    </div>
 </div>
 
-<div class="card filter-card">
-    <form method="get" class="filter-form">
-        <div class="filter-row">
-            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="Search by name, phone or email...">
+<div class="rb-grid g6">
+    {% for k in tiles %}
+    <div class="rb-card rb-kpi">
+        <div class="ic {{ k.tone }}">{{ k.icon|safe }}</div>
+        <div><small>{{ k.label }}</small><div class="v" style="font-size:21px">{{ k.value|stringformat:"d" }}</div>
+            <div class="d {% if not k.ch.up %}down{% endif %}">{% if k.ch.up %}&#8593;{% else %}&#8595;{% endif %} {{ k.ch.pct }}%<i>vs last week</i></div></div>
+    </div>
+    {% endfor %}
+</div>
 
-            <select name="source" class="form-control">
-                <option value="">All Sources</option>
-                {% for value, label in lead_sources %}
-                <option value="{{ value }}" {% if request.GET.source == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-
-            <select name="spo" class="form-control">
-                <option value="">All Sales Persons</option>
-                {% for spo in spos %}
-                <option value="{{ spo.id }}" {% if request.GET.spo == spo.id|stringformat:"s" %}selected{% endif %}>{{ spo.name }}</option>
-                {% endfor %}
-            </select>
-
-            <select name="score" class="form-control">
-                <option value="">Sort by Score</option>
-                <option value="high" {% if request.GET.score == 'high' %}selected{% endif %}>Highest AI Score</option>
-                <option value="low" {% if request.GET.score == 'low' %}selected{% endif %}>Lowest AI Score</option>
-            </select>
-
-            <button type="submit" class="btn btn-small">Filter</button>
+<div class="rb-lead-layout">
+    <div class="rb-card">
+        <div class="rb-tabs">
+            <a href="{% url 'all_leads' %}" class="{% if not current_status %}on{% endif %}">All Leads ({{ tiles.0.value }})</a>
+            {% for k in tiles %}{% if forloop.counter > 1 %}
+            <a href="{% url 'lead_status_list' k.label|lower|cut:' ' %}" class="{% if current_status == k.label|lower %}on{% endif %}">{{ k.label }} ({{ k.value }})</a>
+            {% endif %}{% endfor %}
         </div>
-    </form>
-</div>
 
-<div class="card table-card">
-    <div class="table-scroll">
-    <table>
-        <thead>
-            <tr>
-                <th>Lead</th>
-                <th>Contact</th>
-                <th>Source</th>
-                <th>Status</th>
-                <th>AI Score</th>
-                <th>SPO</th>
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
+        <div style="overflow-x:auto">
+        <table class="rb-table">
+            <thead><tr><th>Name</th><th>Contact</th><th>Source</th><th>Status</th><th>AI Score</th><th>SPO</th><th>Created</th><th>Actions</th></tr></thead>
+            <tbody>
             {% for lead in leads %}
             <tr>
-                <td>
-                    <a href="{% url 'lead_detail' lead.pk %}" class="row-title">{{ lead.name }}</a>
-                    {% if lead.is_duplicate %}<span class="pill pill-lost" style="margin-left:6px;">Duplicate</span>{% endif %}
-                </td>
-                <td>
-                    <div>{{ lead.contact_number }}</div>
-                    {% if lead.email %}<div class="row-subtext">{{ lead.email }}</div>{% endif %}
-                </td>
+                <td><div class="rb-person"><span class="rb-avatar">{{ lead.name|slice:":1"|upper }}</span>
+                    <a class="rb-link" href="{% url 'lead_detail' lead.pk %}">{{ lead.name }}</a>
+                    {% if lead.is_duplicate %}<span class="rb-pill p-lost" style="margin-left:4px">Duplicate</span>{% endif %}</div></td>
+                <td><div>{{ lead.contact_number }}</div>{% if lead.email %}<div style="color:var(--rb-muted);font-size:11px">{{ lead.email }}</div>{% endif %}</td>
                 <td>{{ lead.get_lead_source_display }}</td>
-                <td><span class="pill pill-{{ lead.status }}">{{ lead.get_status_display }}</span></td>
-                <td>
-                    <div class="score-cell">
-                        <div class="progress-bar-wrap" style="width:60px;">
-                            <div class="progress-bar-fill {% if lead.ai_score >= 70 %}done{% elif lead.ai_score < 40 %}warning{% endif %}" style="width:{{ lead.ai_score }}%;"></div>
-                        </div>
-                        <span>{{ lead.ai_score }}</span>
-                    </div>
-                </td>
+                <td><span class="rb-pill p-{{ lead.status }}">{{ lead.get_status_display }}</span></td>
+                <td><div style="display:flex;align-items:center;gap:7px"><div class="rb-mini-bar" style="width:46px"><i style="width:{{ lead.ai_score }}%"></i></div><b>{{ lead.ai_score }}</b></div></td>
                 <td>{{ lead.spo.name|default:"—" }}</td>
-                <td>{{ lead.created_at|date:"d M Y" }}</td>
-                <td>
-                    <div class="action-links">
-                        <a href="{% url 'lead_detail' lead.pk %}">View</a>
-                        {% if request.user|has_full_access:'leads' %}
-                        <a href="{% url 'lead_delete' lead.pk %}" onclick="return confirm('Delete this lead?');">Delete</a>
-                        {% endif %}
-                    </div>
+                <td style="color:var(--rb-muted);white-space:nowrap">{{ lead.created_at|date:"M d, Y" }}</td>
+                <td class="rb-act" style="white-space:nowrap">
+                    <a href="tel:{{ lead.contact_number }}" title="Call">&#128222;</a>
+                    {% if lead.email %}<a href="{% url 'email_compose_lead' lead.pk %}" title="Email">&#9993;</a>{% endif %}
+                    <a href="{% url 'lead_detail' lead.pk %}" title="View">&#128065;</a>
+                    {% if request.user|has_full_access:'leads' %}<a href="{% url 'lead_delete' lead.pk %}" style="color:var(--rb-red)" title="Delete" onclick="return confirm('Delete this lead?');">&#128465;</a>{% endif %}
                 </td>
             </tr>
-            {% empty %}
-            <tr><td colspan="8" class="empty-state">No leads found. Try adjusting your filters.</td></tr>
+            {% empty %}<tr><td colspan="8" class="rb-empty">No leads found. Try adjusting your filters.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        <div class="rb-pager">
+            {% if page_obj.has_previous %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}">&lsaquo;</a>{% endif %}
+            {% for n in page_obj.paginator.page_range %}
+                {% if n == page_obj.number %}<b>{{ n }}</b>
+                {% elif n > page_obj.number|add:"-3" and n < page_obj.number|add:"3" %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ n }}">{{ n }}</a>{% endif %}
             {% endfor %}
-        </tbody>
-    </table>
+            {% if page_obj.has_next %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}">&rsaquo;</a>{% endif %}
+            <span class="sp">Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ total_found }}</span>
+        </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+        <form method="get" class="rb-card">
+            <h3>Lead Filters</h3>
+            <div class="rb-field"><label>Search</label><input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Name, phone or email"></div>
+            <div class="rb-field"><label>Source</label>
+                <select name="source"><option value="">All Sources</option>{% for v, l in lead_sources %}<option value="{{ v }}" {% if request.GET.source == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+            {% if not current_status %}
+            <div class="rb-field"><label>Status</label>
+                <select name="status"><option value="">All Statuses</option>{% for v, l in lead_statuses %}<option value="{{ v }}" {% if request.GET.status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+            {% endif %}
+            <div class="rb-field"><label>Date Range</label>
+                <div style="display:flex;gap:6px"><input type="date" name="date_from" value="{{ request.GET.date_from }}"><input type="date" name="date_to" value="{{ request.GET.date_to }}"></div></div>
+            <div class="rb-field"><label>Assigned To</label>
+                <select name="spo"><option value="">All Users</option>{% for s in spos %}<option value="{{ s.id }}" {% if request.GET.spo == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></div>
+            <div class="rb-field"><label>Sort</label>
+                <select name="score"><option value="">Newest first</option><option value="high" {% if request.GET.score == 'high' %}selected{% endif %}>Highest AI Score</option><option value="low" {% if request.GET.score == 'low' %}selected{% endif %}>Lowest AI Score</option></select></div>
+            <div style="display:flex;gap:8px"><a class="rb-btn" style="flex:1;justify-content:center" href="{% if current_status %}{% url 'lead_status_list' current_status %}{% else %}{% url 'all_leads' %}{% endif %}">Reset</a><button class="rb-btn primary" style="flex:1;justify-content:center" type="submit">Apply</button></div>
+        </form>
+        <div class="rb-card rb-qa">
+            <h3>Quick Actions</h3>
+            {% if request.user|has_full_access:'leads' %}
+            <a href="{% url 'create_lead' %}"><span>&#128100;</span> Add Lead</a>
+            <a href="{% url 'bulk_import_leads' %}"><span>&#11014;</span> Import Leads</a>{% endif %}
+            <a href="{% url 'meeting_create' %}"><span>&#128197;</span> Schedule Meeting</a>
+            <a href="{% url 'opportunity_create' %}"><span>&#128188;</span> Create Deal</a>
+            <a href="{% url 'communication_create' %}"><span>&#128221;</span> Add Note</a>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -47,8 +47,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'leads',
     'chatbot',
-    'capi',   # Conversion API Center (Meta + LinkedIn)
-    'salesai',  # AI Sales Assistant + Product / Offer Matching
+    'capi',  
+    'salesai',  
 ]
 
 MIDDLEWARE = [
@@ -199,21 +199,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Meta WhatsApp Cloud API
 META_WHATSAPP_TOKEN = os.getenv('META_WHATSAPP_TOKEN', '')
 META_PHONE_NUMBER_ID = os.getenv('META_PHONE_NUMBER_ID', '')
-META_VERIFY_TOKEN = os.getenv('META_VERIFY_TOKEN', 'leadcrm123')
+META_VERIFY_TOKEN = os.getenv('META_VERIFY_TOKEN', 'hsi123')
 
 
-TWILIO_ACCOUNT_SID = 'your_sid'
-TWILIO_AUTH_TOKEN = 'your_auth_token'
-TWILIO_PHONE_NUMBER = '+1XXXXXXXXXX'          # normal calling number
-TWILIO_WHATSAPP_NUMBER = 'whatsapp:+1XXXXXXXXXX'  
-GOOGLE_CLIENT_ID = 'your_client_id'
-GOOGLE_CLIENT_SECRET = 'your_client_secret'
+
 GOOGLE_REDIRECT_URI = 'http://127.0.0.1:8000/google/callback/'
 
 SITE_BASE_URL = 'http://127.0.0.1:8000'  # Twilio ko recording callback ke liye chahiye — public URL hona zaroori hai
-
-
-# Add these to your existing settings.py (do NOT overwrite the whole file)
 
 
 # ---------- Base URL ----------
