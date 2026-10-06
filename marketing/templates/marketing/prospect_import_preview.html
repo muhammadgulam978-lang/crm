@@ -1,0 +1,74 @@
+{% extends 'leads/base.html' %}
+{% block title %}Import preview{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Import Prospects — Step 2 of 2</h2>
+</div>
+{% include 'marketing/_nav.html' with nav='prospects' %}
+
+<div class="kpi-grid" style="margin-bottom:18px">
+  <div class="kpi-card"><div class="kpi-body">
+    <div class="kpi-label">Valid</div>
+    <div class="kpi-value" style="color:#16a34a">{{ counts.ok }}</div>
+  </div></div>
+  <div class="kpi-card"><div class="kpi-body">
+    <div class="kpi-label">Duplicates</div>
+    <div class="kpi-value" style="color:#d97706">{{ counts.duplicate }}</div>
+  </div></div>
+  <div class="kpi-card"><div class="kpi-body">
+    <div class="kpi-label">Invalid</div>
+    <div class="kpi-value" style="color:#dc2626">{{ counts.invalid }}</div>
+  </div></div>
+</div>
+
+<p class="mkt-muted">
+  Only <strong>valid</strong> rows will be imported. Duplicates and invalid rows are skipped.
+  Review the list below, then click <strong>Confirm import</strong>.
+</p>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="table-card">
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:60px">Row</th>
+          <th style="width:100px">Status</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Company</th>
+          <th>Issues</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{ r.row_number }}</td>
+            <td>
+              {% if r.status == 'ok' %}
+                <span class="badge badge-green">valid</span>
+              {% elif r.status == 'duplicate' %}
+                <span class="badge badge-orange">duplicate</span>
+              {% else %}
+                <span class="badge badge-red">invalid</span>
+              {% endif %}
+            </td>
+            <td>{{ r.cleaned.name|default:r.raw.name|default:"—" }}</td>
+            <td>{{ r.cleaned.email|default:r.raw.email|default:"—" }}</td>
+            <td>{{ r.raw.contact_number|default:"—" }}</td>
+            <td>{{ r.cleaned.company|default:r.raw.company|default:"—" }}</td>
+            <td class="mkt-muted">{{ r.issues|join:", "|default:"—" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="form-actions" style="margin-top:18px;display:flex;gap:10px">
+    <a href="{% url 'marketing:prospect_import' %}" class="btn" style="background:#64748b">Upload different file</a>
+    <a href="{% url 'marketing:prospect_list' %}" class="btn" style="background:#64748b">Cancel</a>
+    <button class="btn" type="submit">Confirm import ({{ counts.ok }} rows)</button>
+  </div>
+</form>
+{% endblock %}

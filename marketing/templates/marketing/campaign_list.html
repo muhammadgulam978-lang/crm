@@ -1,0 +1,57 @@
+{% extends 'leads/base.html' %}
+{% block title %}Campaigns{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Campaigns</h2>
+  <a class="btn btn-small" href="{% url 'marketing:campaign_create' %}">+ New campaign</a>
+</div>
+{% include 'marketing/_nav.html' with nav='campaigns' %}
+
+<form method="get" style="margin-bottom:14px">
+  <select name="status" onchange="this.form.submit()" class="form-control" style="max-width:220px">
+    <option value="">All statuses</option>
+    {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+<div class="table-card">
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Channel</th>
+        <th>Status</th>
+        <th>Source</th>
+        <th>Budget</th>
+        <th>Dates</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in campaigns %}
+        <tr>
+          <td>{{ c.name }}</td>
+          <td>{{ c.get_channel_display }}</td>
+          <td><span class="badge badge-blue">{{ c.get_status_display }}</span></td>
+          <td>{{ c.source.name|default:"—" }}</td>
+          <td>{{ c.budget_currency }} {{ c.budget_amount|default:"—" }}</td>
+          <td>{{ c.start_date|default:"—" }} → {{ c.end_date|default:"—" }}</td>
+          <td>
+            <a href="{% url 'marketing:campaign_edit' c.pk %}">Edit</a>
+            &nbsp;·&nbsp;
+            <a href="{% url 'marketing:campaign_delete' c.pk %}" style="color:#dc2626">Delete</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="7" class="mkt-muted" style="text-align:center">
+            No campaigns yet. <a href="{% url 'marketing:campaign_create' %}">Create one</a>.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

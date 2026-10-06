@@ -1,0 +1,624 @@
+"""Marketing Center views — Phase 1."""
+from datetime import timedelta
+
+from django.contrib import messages
+from django.db.models import Count, Q, Sum
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+
+
+import csv
+from django.http import HttpResponse
+from django.core.paginator import Paginator
+from django.db.models import Q
+
+from .forms import ProspectForm, ProspectImportForm
+from .services import prospect_import as pi
+
+
+from leads.decorators import role_required
+from leads.models import Lead
+from .models import (ProspectSource, Campaign, MarketingContent, MarketingConsent,
+                     SuppressionEntry, AutomationRun, AutomationStep, Referral)
+from . import constants as C
+
+# Marketing Center — admin / manager / CEO only (superuser auto-passes)
+marketing_access = role_required('admin', 'sales_manager', 'ceo')
+
+
+@marketing_access
+def dashboard(request):
+    now = timezone.now()
+    since_30 = now - timedelta(days=30)
+
+    campaigns = Campaign.objects.all()
+
+    sources_with_leads = (
+        ProspectSource.objects
+        .annotate(lead_count=Count('leads', filter=Q(leads__created_at__gte=since_30)))
+        .filter(lead_count__gt=0)
+        .order_by('-lead_count')[:8]
+    )
+
+    by_channel = (
+        MarketingConsent.objects
+        .filter(status=C.CONSENT_GRANTED)
+        .values('channel')
+        .annotate(n=Count('id'))
+        .order_by('-n')
+    )
+
+    # Lead funnel by marketing_source (uses Lead.marketing_source if you added it)
+    has_mkt_source = hasattr(Lead, 'marketing_source')
+    kpis = [
+        ('Campaigns', campaigns.count()),
+        ('Active now', campaigns.filter(status=C.CAMPAIGN_STATUS_ACTIVE).count()),
+        ('Sources', ProspectSource.objects.filter(is_active=True).count()),
+        ('Content pieces', MarketingContent.objects.filter(is_active=True).count()),
+        ('Consent granted', MarketingConsent.objects.filter(status=C.CONSENT_GRANTED).count()),
+        ('Suppressed', SuppressionEntry.objects.count()),
+        ('Referrals', Referral.objects.count()),
+        ('Automations', AutomationRun.objects.exclude(status='done').count()),
+    ]
+
+    ctx = {
+        'active': 'marketing',
+        'kpis': kpis,
+        'sources': sources_with_leads,
+        'by_channel': by_channel,
+        'recent_campaigns': campaigns.order_by('-created_at')[:8],
+        'pending_referrals': Referral.objects.filter(status=C.REFERRAL_STATUS_PENDING).count(),
+        'pending_automations': AutomationRun.objects.filter(status=C.AUTOMATION_STATUS_PENDING).count(),
+        'has_mkt_source': has_mkt_source,
+        'total_leads': Lead.objects.count(),
+    }
+    return render(request, 'marketing/dashboard.html', ctx)
+
+
+@marketing_access
+def campaign_list(request):
+    qs = Campaign.objects.select_related('source', 'owner')
+    status_filter = request.GET.get('status', '')
+    if status_filter in dict(C.CAMPAIGN_STATUS_CHOICES):
+        qs = qs.filter(status=status_filter)
+    return render(request, 'marketing/campaign_list.html', {
+        'active': 'marketing',
+        'campaigns': qs,
+        'status_filter': status_filter,
+        'status_choices': C.CAMPAIGN_STATUS_CHOICES,
+    })
+
+
+@marketing_access
+def source_list(request):
+    qs = ProspectSource.objects.all()
+    kind = request.GET.get('kind', '')
+    if kind in dict(C.SOURCE_KIND_CHOICES):
+        qs = qs.filter(kind=kind)
+    qs = qs.annotate(lead_count=Count('leads'))
+    return render(request, 'marketing/source_list.html', {
+        'active': 'marketing',
+        'sources': qs,
+        'kind_filter': kind,
+        'kind_choices': C.SOURCE_KIND_CHOICES,
+    })
+
+
+@marketing_access
+def content_list(request):
+    qs = MarketingContent.objects.select_related('campaign')
+    kind = request.GET.get('kind', '')
+    if kind in dict(C.CONTENT_KIND_CHOICES):
+        qs = qs.filter(kind=kind)
+    return render(request, 'marketing/content_list.html', {
+        'active': 'marketing',
+        'contents': qs[:200],
+        'kind_filter': kind,
+        'kind_choices': C.CONTENT_KIND_CHOICES,
+    })
+
+
+@marketing_access
+def consent_list(request):
+    qs = MarketingConsent.objects.select_related('lead')
+    status_filter = request.GET.get('status', '')
+    if status_filter in dict(C.CONSENT_STATUS_CHOICES):
+        qs = qs.filter(status=status_filter)
+    return render(request, 'marketing/consent_list.html', {
+        'active': 'marketing',
+        'consents': qs[:200],
+        'status_filter': status_filter,
+        'status_choices': C.CONSENT_STATUS_CHOICES,
+    })
+
+
+@marketing_access
+def suppression_list(request):
+    qs = SuppressionEntry.objects.all().order_by('-created_at')
+    channel = request.GET.get('channel', '')
+    if channel in dict(C.CHANNEL_CHOICES):
+        qs = qs.filter(channel=channel)
+    return render(request, 'marketing/suppression_list.html', {
+        'active': 'marketing',
+        'entries': qs[:200],
+        'channel_filter': channel,
+        'channel_choices': C.CHANNEL_CHOICES,
+    })
+
+
+@marketing_access
+def referral_list(request):
+    qs = Referral.objects.select_related('referrer_lead', 'referred_lead', 'campaign')
+    status_filter = request.GET.get('status', '')
+    if status_filter in dict(C.REFERRAL_STATUS_CHOICES):
+        qs = qs.filter(status=status_filter)
+    return render(request, 'marketing/referral_list.html', {
+        'active': 'marketing',
+        'referrals': qs[:200],
+        'status_filter': status_filter,
+        'status_choices': C.REFERRAL_STATUS_CHOICES,
+    })
+
+
+@marketing_access
+def automation_list(request):
+    qs = AutomationRun.objects.select_related('lead', 'campaign')
+    status_filter = request.GET.get('status', '')
+    if status_filter in dict(C.AUTOMATION_STATUS_CHOICES):
+        qs = qs.filter(status=status_filter)
+    qs = qs.annotate(step_count=Count('steps'))
+    return render(request, 'marketing/automation_list.html', {
+        'active': 'marketing',
+        'runs': qs[:200],
+        'status_filter': status_filter,
+        'status_choices': C.AUTOMATION_STATUS_CHOICES,
+    })
+    
+    
+    
+# =========================================================================
+# CRUD views — Marketing Center ka apna UI (Django Admin ka istemal nahi)
+# =========================================================================
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib import messages
+from django.db import transaction
+
+from .forms import (ProspectSourceForm, CampaignForm, MarketingContentForm,
+                    MarketingConsentForm, SuppressionEntryForm, ReferralForm,
+                    AutomationRunForm, AutomationStepForm)
+from .models import AutomationStep
+
+
+# ---------- helpers ----------
+def _save_form(request, form, success_url, success_msg, cancel_url, template, extra=None):
+    """Generic pattern for create/edit."""
+    if request.method == 'POST':
+        if form.is_valid():
+            obj = form.save()
+            messages.success(request, success_msg)
+            return redirect(success_url)
+    ctx = {'form': form, 'cancel_url': cancel_url}
+    if extra:
+        ctx.update(extra)
+    return render(request, template, ctx)
+
+
+# ---------- ProspectSource ----------
+@marketing_access
+def source_create(request):
+    form = ProspectSourceForm(request.POST or None)
+    return _save_form(request, form, 'marketing:source_list',
+                      'Source created.', 'marketing:source_list',
+                      'marketing/source_form.html',
+                      {'obj': None})
+
+
+@marketing_access
+def source_edit(request, pk):
+    obj = get_object_or_404(ProspectSource, pk=pk)
+    form = ProspectSourceForm(request.POST or None, instance=obj)
+    return _save_form(request, form, 'marketing:source_list',
+                      'Source updated.', 'marketing:source_list',
+                      'marketing/source_form.html',
+                      {'obj': obj})
+
+
+@marketing_access
+def source_delete(request, pk):
+    obj = get_object_or_404(ProspectSource, pk=pk)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Source deleted.')
+        return redirect('marketing:source_list')
+    return render(request, 'marketing/_confirm_delete.html', {
+        'active': 'marketing', 'obj': obj, 'obj_name': obj.name,
+        'cancel_url': 'marketing:source_list',
+    })
+
+
+# ---------- Campaign ----------
+@marketing_access
+def campaign_create(request):
+    form = CampaignForm(request.POST or None)
+    return _save_form(request, form, 'marketing:campaign_list',
+                      'Campaign created.', 'marketing:campaign_list',
+                      'marketing/campaign_form.html',
+                      {'obj': None})
+
+
+@marketing_access
+def campaign_edit(request, pk):
+    obj = get_object_or_404(Campaign, pk=pk)
+    form = CampaignForm(request.POST or None, instance=obj)
+    return _save_form(request, form, 'marketing:campaign_list',
+                      'Campaign updated.', 'marketing:campaign_list',
+                      'marketing/campaign_form.html',
+                      {'obj': obj})
+
+
+@marketing_access
+def campaign_delete(request, pk):
+    obj = get_object_or_404(Campaign, pk=pk)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Campaign deleted.')
+        return redirect('marketing:campaign_list')
+    return render(request, 'marketing/_confirm_delete.html', {
+        'active': 'marketing', 'obj': obj, 'obj_name': obj.name,
+        'cancel_url': 'marketing:campaign_list',
+    })
+
+
+# ---------- MarketingContent ----------
+@marketing_access
+def content_create(request):
+    form = MarketingContentForm(request.POST or None)
+    return _save_form(request, form, 'marketing:content_list',
+                      'Content created.', 'marketing:content_list',
+                      'marketing/content_form.html',
+                      {'obj': None})
+
+
+@marketing_access
+def content_edit(request, pk):
+    obj = get_object_or_404(MarketingContent, pk=pk)
+    form = MarketingContentForm(request.POST or None, instance=obj)
+    return _save_form(request, form, 'marketing:content_list',
+                      'Content updated.', 'marketing:content_list',
+                      'marketing/content_form.html',
+                      {'obj': obj})
+
+
+@marketing_access
+def content_delete(request, pk):
+    obj = get_object_or_404(MarketingContent, pk=pk)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Content deleted.')
+        return redirect('marketing:content_list')
+    return render(request, 'marketing/_confirm_delete.html', {
+        'active': 'marketing', 'obj': obj, 'obj_name': obj.title,
+        'cancel_url': 'marketing:content_list',
+    })
+
+
+# ---------- MarketingConsent ----------
+@marketing_access
+def consent_create(request):
+    form = MarketingConsentForm(request.POST or None)
+    return _save_form(request, form, 'marketing:consent_list',
+                      'Consent recorded.', 'marketing:consent_list',
+                      'marketing/consent_form.html',
+                      {'obj': None})
+
+
+@marketing_access
+def consent_edit(request, pk):
+    obj = get_object_or_404(MarketingConsent, pk=pk)
+    form = MarketingConsentForm(request.POST or None, instance=obj)
+    return _save_form(request, form, 'marketing:consent_list',
+                      'Consent updated.', 'marketing:consent_list',
+                      'marketing/consent_form.html',
+                      {'obj': obj})
+
+
+@marketing_access
+def consent_delete(request, pk):
+    obj = get_object_or_404(MarketingConsent, pk=pk)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Consent record deleted.')
+        return redirect('marketing:consent_list')
+    return render(request, 'marketing/_confirm_delete.html', {
+        'active': 'marketing', 'obj': obj,
+        'obj_name': f'Consent {obj.channel}/{obj.purpose} for lead {obj.lead_id}',
+        'cancel_url': 'marketing:consent_list',
+    })
+
+
+# ---------- SuppressionEntry ----------
+@marketing_access
+def suppression_create(request):
+    form = SuppressionEntryForm(request.POST or None)
+    return _save_form(request, form, 'marketing:suppression_list',
+                      'Suppression added.', 'marketing:suppression_list',
+                      'marketing/suppression_form.html',
+                      {'obj': None})
+
+
+@marketing_access
+def suppression_edit(request, pk):
+    obj = get_object_or_404(SuppressionEntry, pk=pk)
+    form = SuppressionEntryForm(request.POST or None, instance=obj)
+    return _save_form(request, form, 'marketing:suppression_list',
+                      'Suppression updated.', 'marketing:suppression_list',
+                      'marketing/suppression_form.html',
+                      {'obj': obj})
+
+
+@marketing_access
+def suppression_delete(request, pk):
+    obj = get_object_or_404(SuppressionEntry, pk=pk)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Suppression removed.')
+        return redirect('marketing:suppression_list')
+    return render(request, 'marketing/_confirm_delete.html', {
+        'active': 'marketing', 'obj': obj, 'obj_name': f'{obj.channel}:{obj.value}',
+        'cancel_url': 'marketing:suppression_list',
+    })
+
+
+# ---------- Referral ----------
+@marketing_access
+def referral_create(request):
+    form = ReferralForm(request.POST or None)
+    return _save_form(request, form, 'marketing:referral_list',
+                      'Referral created.', 'marketing:referral_list',
+                      'marketing/referral_form.html',
+                      {'obj': None})
+
+
+@marketing_access
+def referral_edit(request, pk):
+    obj = get_object_or_404(Referral, pk=pk)
+    form = ReferralForm(request.POST or None, instance=obj)
+    return _save_form(request, form, 'marketing:referral_list',
+                      'Referral updated.', 'marketing:referral_list',
+                      'marketing/referral_form.html',
+                      {'obj': obj})
+
+
+@marketing_access
+def referral_delete(request, pk):
+    obj = get_object_or_404(Referral, pk=pk)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Referral deleted.')
+        return redirect('marketing:referral_list')
+    return render(request, 'marketing/_confirm_delete.html', {
+        'active': 'marketing', 'obj': obj,
+        'obj_name': f'Referral #{obj.pk}', 'cancel_url': 'marketing:referral_list',
+    })
+
+
+# ---------- AutomationRun ----------
+@marketing_access
+def automation_create(request):
+    form = AutomationRunForm(request.POST or None)
+    return _save_form(request, form, 'marketing:automation_list',
+                      'Automation run created.', 'marketing:automation_list',
+                      'marketing/automation_form.html',
+                      {'obj': None})
+
+
+@marketing_access
+def automation_edit(request, pk):
+    obj = get_object_or_404(AutomationRun, pk=pk)
+    form = AutomationRunForm(request.POST or None, instance=obj)
+    return _save_form(request, form, 'marketing:automation_list',
+                      'Automation run updated.', 'marketing:automation_list',
+                      'marketing/automation_form.html',
+                      {'obj': obj})
+
+
+@marketing_access
+def automation_delete(request, pk):
+    obj = get_object_or_404(AutomationRun, pk=pk)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Automation run deleted.')
+        return redirect('marketing:automation_list')
+    return render(request, 'marketing/_confirm_delete.html', {
+        'active': 'marketing', 'obj': obj,
+        'obj_name': f'Automation run #{obj.pk}', 'cancel_url': 'marketing:automation_list',
+    })
+    
+    
+# =========================================================================
+# Prospects — manual + CSV import
+# =========================================================================
+
+
+
+
+
+def _prospects_base_qs(request):
+    """Common filters for the prospect list."""
+    qs = Lead.objects.filter(marketing_source__isnull=False).select_related(
+        'marketing_source', 'interested_service', 'spo'
+    )
+    q = (request.GET.get('q') or '').strip()
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q) | Q(email__icontains=q) |
+            Q(contact_number__icontains=q) | Q(business_requirement__icontains=q)
+        )
+    source_id = request.GET.get('source', '')
+    if source_id.isdigit():
+        qs = qs.filter(marketing_source_id=int(source_id))
+    status = request.GET.get('status', '')
+    if status:
+        qs = qs.filter(status=status)
+    return qs
+
+
+@marketing_access
+def prospect_list(request):
+    qs = _prospects_base_qs(request).order_by('-created_at')
+    page = Paginator(qs, 25).get_page(request.GET.get('page'))
+    return render(request, 'marketing/prospect_list.html', {
+        'active': 'marketing',
+        'page_obj': page,
+        'total': qs.count(),
+        'sources': ProspectSource.objects.filter(is_active=True).order_by('kind', 'name'),
+        'status_choices': [('new', 'New'), ('positive', 'Positive'),
+                           ('quotation', 'Quotation'), ('converted', 'Converted'),
+                           ('lost', 'Lost')],
+        'q': request.GET.get('q', ''),
+        'source_filter': request.GET.get('source', ''),
+        'status_filter': request.GET.get('status', ''),
+    })
+
+
+@marketing_access
+def prospect_create(request):
+    if request.method == 'POST':
+        form = ProspectForm(request.POST)
+        if form.is_valid():
+            lead = form.save(commit=False)
+            if not lead.research_date:
+                lead.research_date = timezone.localdate()
+            lead.save()
+            messages.success(request, f'Prospect "{lead.name}" created.')
+            return redirect('marketing:prospect_list')
+    else:
+        form = ProspectForm(initial={'research_date': timezone.localdate()})
+    return render(request, 'marketing/prospect_form.html', {
+        'active': 'marketing', 'form': form, 'obj': None,
+        'cancel_url': 'marketing:prospect_list',
+    })
+
+
+@marketing_access
+def prospect_edit(request, pk):
+    obj = get_object_or_404(Lead, pk=pk)
+    if request.method == 'POST':
+        form = ProspectForm(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Prospect "{obj.name}" updated.')
+            return redirect('marketing:prospect_list')
+    else:
+        form = ProspectForm(instance=obj)
+    return render(request, 'marketing/prospect_form.html', {
+        'active': 'marketing', 'form': form, 'obj': obj,
+        'cancel_url': 'marketing:prospect_list',
+    })
+
+
+@marketing_access
+def prospect_delete(request, pk):
+    obj = get_object_or_404(Lead, pk=pk)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Prospect deleted.')
+        return redirect('marketing:prospect_list')
+    return render(request, 'marketing/_confirm_delete.html', {
+        'active': 'marketing', 'obj': obj, 'obj_name': obj.name,
+        'cancel_url': 'marketing:prospect_list',
+    })
+
+
+@marketing_access
+def prospect_import(request):
+    """Step 1 — upload."""
+    if request.method == 'POST':
+        form = ProspectImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                headers, rows = pi.parse_file(form.cleaned_data['file'])
+            except ValueError as e:
+                messages.error(request, str(e))
+                return render(request, 'marketing/prospect_import.html', {
+                    'active': 'marketing', 'form': form, 'step': 1,
+                })
+            if not rows:
+                messages.error(request, 'The file contains no data rows.')
+                return render(request, 'marketing/prospect_import.html', {
+                    'active': 'marketing', 'form': form, 'step': 1,
+                })
+            validated = pi.validate_rows(rows)
+            # Stash in session so we don't re-upload
+            request.session['prospect_import'] = {
+                'rows': [{'raw': v.raw, 'cleaned': v.cleaned, 'status': v.status,
+                          'issues': v.issues, 'duplicate_of': v.duplicate_of,
+                          'row_number': v.row_number} for v in validated],
+                'source_id': form.cleaned_data['source'].pk if form.cleaned_data['source'] else None,
+                'default_status': form.cleaned_data['default_status'],
+            }
+            return redirect('marketing:prospect_import_preview')
+    else:
+        form = ProspectImportForm()
+    return render(request, 'marketing/prospect_import.html', {
+        'active': 'marketing', 'form': form, 'step': 1,
+    })
+
+
+@marketing_access
+def prospect_import_preview(request):
+    """Step 2 — preview validated rows."""
+    stash = request.session.get('prospect_import')
+    if not stash:
+        messages.error(request, 'No file uploaded. Please start again.')
+        return redirect('marketing:prospect_import')
+
+    rows = stash['rows']
+    counts = {'ok': 0, 'duplicate': 0, 'invalid': 0}
+    for r in rows:
+        counts[r['status']] = counts.get(r['status'], 0) + 1
+
+    if request.method == 'POST':
+        # User confirmed — import
+        source = None
+        if stash.get('source_id'):
+            source = ProspectSource.objects.filter(pk=stash['source_id']).first()
+        # Re-hydrate ValidatedRow objects
+        vs = []
+        for r in rows:
+            v = pi.ValidatedRow(
+                row_number=r['row_number'], raw=r['raw'], cleaned=r['cleaned'],
+                status=r['status'], issues=r['issues'], duplicate_of=r['duplicate_of'],
+            )
+            vs.append(v)
+        result = pi.import_rows(vs, source=source,
+                                 default_status=stash['default_status'],
+                                 user=request.user)
+        request.session.pop('prospect_import', None)
+        messages.success(
+            request,
+            f"Import complete: {result['created']} created, "
+            f"{result['skipped_duplicate']} duplicates skipped, "
+            f"{result['skipped_invalid']} invalid skipped."
+        )
+        return redirect('marketing:prospect_list')
+
+    return render(request, 'marketing/prospect_import_preview.html', {
+        'active': 'marketing', 'rows': rows, 'counts': counts,
+    })
+
+
+@marketing_access
+def prospect_import_template(request):
+    """Download a starter CSV."""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="prospect_template.csv"'
+    w = csv.writer(response)
+    w.writerow(['Name', 'Company', 'Email', 'Phone', 'Country', 'City',
+                'Industry', 'Website', 'Source URL', 'Requirement', 'Notes'])
+    w.writerow(['John Doe', 'Acme Software', 'john@acme.com', '+92 300 1234567',
+                'Pakistan', 'Lahore', 'Technology', 'https://acme.com',
+                'https://linkedin.com/in/johndoe',
+                'Needs an AI chatbot for customer support',
+                'Referred by existing client'])
+    return response    

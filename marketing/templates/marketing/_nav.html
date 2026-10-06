@@ -1,0 +1,18 @@
+<style>
+.mkt-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+.mkt-nav a{padding:7px 14px;border-radius:20px;background:#fff;border:1px solid #e5e7eb;font-size:13px;color:inherit;text-decoration:none}
+.mkt-nav a.on{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-color:transparent}
+.mkt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.mkt-muted{color:#6b7280;font-size:12.5px}
+</style>
+<div class="mkt-nav">
+  <a href="{% url 'marketing:dashboard' %}" class="{% if nav == 'dashboard' %}on{% endif %}">Dashboard</a>
+  <a href="{% url 'marketing:campaign_list' %}" class="{% if nav == 'campaigns' %}on{% endif %}">Campaigns</a>
+  <a href="{% url 'marketing:source_list' %}" class="{% if nav == 'sources' %}on{% endif %}">Sources</a>
+  <a href="{% url 'marketing:content_list' %}" class="{% if nav == 'content' %}on{% endif %}">Content</a>
+  <a href="{% url 'marketing:consent_list' %}" class="{% if nav == 'consent' %}on{% endif %}">Consent</a>
+  <a href="{% url 'marketing:suppression_list' %}" class="{% if nav == 'suppression' %}on{% endif %}">Suppression</a>
+  <a href="{% url 'marketing:referral_list' %}" class="{% if nav == 'referrals' %}on{% endif %}">Referrals</a>
+  <a href="{% url 'marketing:automation_list' %}" class="{% if nav == 'automation' %}on{% endif %}">Automation</a>
+  <a href="{% url 'marketing:prospect_list' %}" class="{% if nav == 'prospects' %}on{% endif %}">Prospects</a>
+</div>

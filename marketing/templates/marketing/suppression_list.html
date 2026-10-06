@@ -1,0 +1,46 @@
+{% extends 'leads/base.html' %}
+{% block title %}Suppression{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Suppression List</h2>
+  <a class="btn btn-small" href="{% url 'marketing:suppression_create' %}">+ Add entry</a>
+</div>
+{% include 'marketing/_nav.html' with nav='suppression' %}
+
+<div class="table-card">
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Channel</th>
+        <th>Value</th>
+        <th>Reason</th>
+        <th>Expires</th>
+        <th>Added</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+        <tr>
+          <td>{{ e.get_channel_display }}</td>
+          <td>{{ e.value }}</td>
+          <td>{{ e.get_reason_display }}</td>
+          <td>{{ e.expires_at|default:"never" }}</td>
+          <td>{{ e.created_at|date:"d M Y" }}</td>
+          <td>
+            <a href="{% url 'marketing:suppression_edit' e.pk %}">Edit</a>
+            &nbsp;·&nbsp;
+            <a href="{% url 'marketing:suppression_delete' e.pk %}" style="color:#dc2626">Delete</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6" class="mkt-muted" style="text-align:center">
+            Suppression list is empty. <a href="{% url 'marketing:suppression_create' %}">Add entry</a>.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

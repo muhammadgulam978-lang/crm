@@ -1,0 +1,87 @@
+{% extends 'leads/base.html' %}
+{% block title %}Prospects{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Prospects</h2>
+  <div style="display:flex;gap:8px">
+    <a class="btn btn-small" href="{% url 'marketing:prospect_import_template' %}" style="background:#64748b">Download template</a>
+    <a class="btn btn-small" href="{% url 'marketing:prospect_import' %}" style="background:#0891b2">Import CSV / Excel</a>
+    <a class="btn btn-small" href="{% url 'marketing:prospect_create' %}">+ New prospect</a>
+  </div>
+</div>
+{% include 'marketing/_nav.html' with nav='prospects' %}
+
+<form method="get" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap">
+  <input class="form-control" name="q" value="{{ q }}" placeholder="Search name, email, phone, requirement" style="max-width:320px">
+  <select class="form-control" name="source" style="max-width:220px">
+    <option value="">All sources</option>
+    {% for s in sources %}
+      <option value="{{ s.pk }}" {% if source_filter == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+    {% endfor %}
+  </select>
+  <select class="form-control" name="status" style="max-width:180px">
+    <option value="">All statuses</option>
+    {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn btn-small">Filter</button>
+  <span class="mkt-muted" style="align-self:center">{{ total }} result{{ total|pluralize }}</span>
+</form>
+
+<div class="table-card">
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Contact</th>
+        <th>Source</th>
+        <th>Requirement</th>
+        <th>Status</th>
+        <th>Researched</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in page_obj %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td>
+            {% if p.email %}<div>{{ p.email }}</div>{% endif %}
+            {% if p.contact_number %}<div class="mkt-muted">{{ p.contact_number }}</div>{% endif %}
+          </td>
+          <td>{{ p.marketing_source.name|default:"—" }}</td>
+          <td>{{ p.business_requirement|default:"—"|truncatechars:60 }}</td>
+          <td><span class="badge badge-blue">{{ p.get_status_display }}</span></td>
+          <td>{{ p.research_date|default:"—" }}</td>
+          <td>
+            <a href="{% url 'marketing:prospect_edit' p.pk %}">Edit</a>
+            &nbsp;·&nbsp;
+            <a href="{% url 'marketing:prospect_delete' p.pk %}" style="color:#dc2626">Delete</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="7" class="mkt-muted" style="text-align:center">
+            No prospects yet.
+            <a href="{% url 'marketing:prospect_create' %}">Add one</a> or
+            <a href="{% url 'marketing:prospect_import' %}">import a CSV</a>.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&source={{ source_filter }}&status={{ status_filter }}">Previous</a>
+    {% endif %}
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&source={{ source_filter }}&status={{ status_filter }}">Next</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends 'leads/base.html' %}
+{% block title %}Consent{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Consent Records</h2>
+  <a class="btn btn-small" href="{% url 'marketing:consent_create' %}">+ Record consent</a>
+</div>
+{% include 'marketing/_nav.html' with nav='consent' %}
+
+<form method="get" style="margin-bottom:14px">
+  <select name="status" onchange="this.form.submit()" class="form-control" style="max-width:220px">
+    <option value="">All statuses</option>
+    {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+<div class="table-card">
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Lead</th>
+        <th>Channel</th>
+        <th>Purpose</th>
+        <th>Status</th>
+        <th>Source</th>
+        <th>Updated</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in consents %}
+        <tr>
+          <td>{{ c.lead.name }}</td>
+          <td>{{ c.get_channel_display }}</td>
+          <td>{{ c.get_purpose_display }}</td>
+          <td>
+            <span class="badge {% if c.status == 'granted' %}badge-green{% elif c.status == 'denied' %}badge-red{% else %}badge-orange{% endif %}">
+              {{ c.get_status_display }}
+            </span>
+          </td>
+          <td>{{ c.get_source_display|default:"—" }}</td>
+          <td>{{ c.updated_at|date:"d M H:i" }}</td>
+          <td>
+            <a href="{% url 'marketing:consent_edit' c.pk %}">Edit</a>
+            &nbsp;·&nbsp;
+            <a href="{% url 'marketing:consent_delete' c.pk %}" style="color:#dc2626">Delete</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="7" class="mkt-muted" style="text-align:center">
+            No consent records yet. <a href="{% url 'marketing:consent_create' %}">Record one</a>.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

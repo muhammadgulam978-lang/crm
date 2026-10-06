@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     'leads',
     'chatbot',
     'capi',  
-    'salesai',  
+    'salesai',
+    'marketing',    
 ]
 
 MIDDLEWARE = [

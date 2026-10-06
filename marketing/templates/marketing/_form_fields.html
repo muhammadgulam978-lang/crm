@@ -1,0 +1,21 @@
+{% for f in form %}
+  <div class="form-row" style="margin-bottom:14px">
+    {% if f.field.widget.input_type == 'checkbox' %}
+      <label style="display:flex;align-items:center;gap:8px">{{ f }} {{ f.label }}</label>
+    {% else %}
+      <label style="display:block;margin-bottom:4px;font-weight:500">
+        {{ f.label }}{% if f.field.required %} <span style="color:#dc2626">*</span>{% endif %}
+      </label>
+      {{ f }}
+    {% endif %}
+    {% if f.help_text %}
+      <div style="color:#6b7280;font-size:12.5px;margin-top:2px">{{ f.help_text }}</div>
+    {% endif %}
+    {% for e in f.errors %}
+      <div style="color:#b91c1c;font-size:13px;margin-top:2px">{{ e }}</div>
+    {% endfor %}
+  </div>
+{% endfor %}
+{% for e in form.non_field_errors %}
+  <div style="color:#b91c1c;margin-bottom:10px">{{ e }}</div>
+{% endfor %}

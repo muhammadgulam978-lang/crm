@@ -1,0 +1,41 @@
+{% extends 'leads/base.html' %}
+{% block title %}Import prospects{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Import Prospects — Step 1 of 2</h2>
+  <a class="btn btn-small" href="{% url 'marketing:prospect_import_template' %}" style="background:#64748b">Download template</a>
+</div>
+{% include 'marketing/_nav.html' with nav='prospects' %}
+
+<div class="form-card" style="max-width:800px">
+  <div class="form-card-body" style="padding:20px 28px">
+    <h3 style="margin-top:0">Upload a CSV or Excel file</h3>
+    <p class="mkt-muted">
+      Recognised columns:
+      <strong>Name, Company, Email, Phone, Country, City, Address,
+      Industry, Website, Source URL, Requirement, Notes</strong>.
+      Header names can be in any order. Missing columns are left blank.
+      Max 5 MB, first row must be the header.
+    </p>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {% include 'marketing/_form_fields.html' %}
+      <div class="form-actions" style="margin-top:18px;display:flex;gap:10px">
+        <a href="{% url 'marketing:prospect_list' %}" class="btn" style="background:#64748b">Cancel</a>
+        <button class="btn" type="submit">Upload and preview</button>
+      </div>
+    </form>
+
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb">
+      <h4 style="margin:0 0 8px">How it works</h4>
+      <ol class="mkt-muted" style="margin:0;padding-left:20px;line-height:1.7">
+        <li>Upload a CSV or Excel file.</li>
+        <li>We validate every row and check for duplicates (email + phone).</li>
+        <li>You see a preview: <strong>valid</strong>, <strong>duplicate</strong>, <strong>invalid</strong>.</li>
+        <li>You confirm — only valid rows are imported as CRM leads.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+{% endblock %}

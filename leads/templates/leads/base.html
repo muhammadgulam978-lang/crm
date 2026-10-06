@@ -34,10 +34,7 @@
                 <span class="left"><span class="icon">&#9632;</span> Dashboard</span>
             </a>
 
-            <a href="{% url 'calendar_view' %}" class="{% if active == 'calendar' %}active{% endif %}">
-                <span class="left"><span class="icon">&#128197;</span> Calendar</span>
-            </a>
-
+            
             {% if '*' in allowed_sections or user.profile.role == 'ceo' %}
 
             {% if '*' in allowed_sections or 'ceo_dashboard' in allowed_sections %}
@@ -45,6 +42,7 @@
             <a href="{% url 'ceo_dashboard' %}" class="{% if active == 'ceo_dashboard' %}active{% endif %}">
                 <span class="left"><span class="icon">👑</span> CEO Dashboard</span>
             </a>
+            
             {% endif %}
             {% if user.is_superuser or user.profile.role == 'admin' %}
             <a href="{% url 'user_list' %}" class="{% if active == 'users' %}active{% endif %}">
@@ -60,6 +58,9 @@
             {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'ceo' %}
             <a href="{% url 'capi:dashboard' %}" class="{% if active == 'capi' %}active{% endif %}">
                 <span class="left"><span class="icon">&#128260;</span> Conversion API</span>
+            </a>
+            <a href="{% url 'marketing:dashboard' %}" class="{% if active == 'marketing' %}active{% endif %}">
+           <span class="left"><span class="icon">&#128260;</span> Marketing</span>
             </a>
             {% endif %}
         </nav>
@@ -205,6 +206,12 @@
                 <span class="left"><span class="icon">&#43;</span> Schedule Meeting</span>
             </a>
             {% endif %}
+
+
+            <a href="{% url 'calendar_view' %}" class="{% if active == 'calendar' %}active{% endif %}">
+                <span class="left"><span class="icon">&#128197;</span> Calendar</span>
+            </a>
+
         </nav>
 {% endif %}
 

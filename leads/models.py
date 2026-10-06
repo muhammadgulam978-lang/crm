@@ -144,6 +144,33 @@ class Lead(models.Model):
         null=True, blank=True,
         related_name='duplicates'
     )
+    marketing_source = models.ForeignKey(             
+        'marketing.ProspectSource',
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='leads',
+        help_text='Marketing attribution (distinct from lead_source enum).'
+    )
+   
+    # ---- Marketing Center prospect fields (all optional) ----
+    source_url = models.URLField(
+        blank=True, null=True,
+        help_text='LinkedIn profile, company website, or research source URL.'
+    )
+    research_date = models.DateField(
+        blank=True, null=True,
+        help_text='When this prospect was researched.'
+    )
+    business_requirement = models.TextField(
+        blank=True, null=True,
+        help_text='What the prospect needs (from manual research / form).'
+    )
+    interested_service = models.ForeignKey(
+        'salesai.SISService',
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='marketing_interested_leads', 
+        help_text='Which SIS service the prospect is interested in.'
+    )
+    
     ai_score       = models.IntegerField(default=0, help_text='AI lead score 0-100')
     ai_score_reason = models.TextField(blank=True, null=True)
     ai_score_updated = models.DateTimeField(blank=True, null=True)
@@ -156,6 +183,8 @@ class Lead(models.Model):
     lifetime_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     lifetime_value_updated = models.DateTimeField(blank=True, null=True)
     lifetime_value_reason = models.TextField(blank=True, null=True)
+    
+       
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
@@ -1204,4 +1233,25 @@ class GoogleCredential(models.Model):
 
     def __str__(self):
         return f"Google credentials for {self.user}"
-
+    
+    
+    # Marketing Center — prospect tracking (all optional)
+    source_url = models.URLField(
+        blank=True, null=True,
+        help_text='LinkedIn profile, company website, or research source URL.'
+    )
+    research_date = models.DateField(
+        blank=True, null=True,
+        help_text='When this prospect was researched.'
+    )
+    business_requirement = models.TextField(
+        blank=True, null=True,
+        help_text='What the prospect needs (from manual research / form).'
+    )
+    interested_service = models.ForeignKey(
+        'salesai.SISService',
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='interested_leads',
+        help_text='Which SIS service the prospect is interested in.'
+    )
+    

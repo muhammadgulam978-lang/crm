@@ -1,0 +1,80 @@
+{% extends 'leads/base.html' %}
+{% block title %}Marketing Center{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Marketing Center</h2>
+  <span class="mkt-muted">{{ total_leads }} lead(s) in CRM</span>
+</div>
+{% include 'marketing/_nav.html' with nav='dashboard' %}
+
+<div class="kpi-grid">
+  {% for label, value in kpis %}
+  <div class="kpi-card"><div class="kpi-body">
+    <div class="kpi-label">{{ label }}</div>
+    <div class="kpi-value">{{ value }}</div>
+  </div></div>
+  {% endfor %}
+</div>
+
+<div class="mkt-grid" style="margin-top:18px">
+  <div class="card">
+    <h3 style="margin-top:0">Leads by source (30d)</h3>
+    <table class="items-table">
+      <thead><tr><th>Source</th><th>Kind</th><th>Leads</th></tr></thead>
+      <tbody>
+      {% for s in sources %}
+        <tr><td>{{ s.name }}</td><td>{{ s.get_kind_display }}</td><td>{{ s.lead_count }}</td></tr>
+      {% empty %}
+        <tr><td colspan="3" class="mkt-muted">
+          {% if has_mkt_source %}
+            No leads with marketing source yet. Assign sources from Admin or the Lead detail page.
+          {% else %}
+            Add <code>Lead.marketing_source</code> field first to enable attribution.
+          {% endif %}
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Consent by channel</h3>
+    <table class="items-table">
+      <thead><tr><th>Channel</th><th>Granted</th></tr></thead>
+      <tbody>
+      {% for c in by_channel %}
+        <tr><td>{{ c.channel|title }}</td><td>{{ c.n }}</td></tr>
+      {% empty %}
+        <tr><td colspan="2" class="mkt-muted">No consent records yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">What needs attention</h3>
+    <p><strong>{{ pending_referrals }}</strong> pending referral(s).</p>
+    <p><strong>{{ pending_automations }}</strong> pending automation run(s).</p>
+    <p class="mkt-muted">Run <code>python manage.py run_marketing_automation</code> to advance due steps.</p>
+  </div>
+</div>
+
+<div class="table-card" style="margin-top:18px">
+  <h3 style="padding:14px 16px 0;margin:0">Recent campaigns</h3>
+  <table class="items-table">
+    <thead><tr><th>Name</th><th>Channel</th><th>Status</th><th>Owner</th><th>Start</th></tr></thead>
+    <tbody>
+    {% for c in recent_campaigns %}
+      <tr><td>{{ c.name }}</td><td>{{ c.get_channel_display }}</td>
+          <td><span class="badge badge-blue">{{ c.get_status_display }}</span></td>
+          <td>{{ c.owner.username|default:"—" }}</td>
+          <td>{{ c.start_date|default:"—" }}</td></tr>
+    {% empty %}
+      <tr><td colspan="5" class="mkt-muted">
+        No campaigns yet. Add from <a href="/admin/marketing/campaign/add/">Admin → Campaigns</a>.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
