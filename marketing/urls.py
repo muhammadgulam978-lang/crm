@@ -61,5 +61,10 @@ urlpatterns = [
     path('prospects/import/preview/', views.prospect_import_preview, name='prospect_import_preview'),
     path('prospects/import/template/', views.prospect_import_template, name='prospect_import_template'),
     
+    path('reactivation/', views.reactivation_list, name='reactivation_list'),
+    
+    path('content/calendar/', views.content_calendar, name='content_calendar'),
+    path('content/<int:pk>/status/<str:new_status>/', views.content_transition, name='content_transition'),
+    
      
 ]

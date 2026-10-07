@@ -1,0 +1,63 @@
+{% extends 'leads/base.html' %}
+{% block title %}Content Calendar{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Content Calendar — {{ month_name }} {{ year }}</h2>
+  <div style="display:flex;gap:8px">
+    <a class="btn btn-small" href="?year={{ year }}&month={{ month|add:'-1' }}" style="background:#64748b">← Prev</a>
+    <a class="btn btn-small" href="?year={{ year }}&month={{ month|add:'1' }}" style="background:#64748b">Next →</a>
+    <a class="btn btn-small" href="{% url 'marketing:content_list' %}" style="background:#64748b">List view</a>
+  </div>
+</div>
+{% include 'marketing/_nav.html' with nav='content' %}
+
+<style>
+  .cal-table { width: 100%; border-collapse: collapse; background: #fff; }
+  .cal-table th { background: #f3f4f6; padding: 8px; font-size: 12px; text-align: left; color: #6b7280; }
+  .cal-table td { border: 1px solid #e5e7eb; vertical-align: top; height: 110px; padding: 6px; width: 14.28%; }
+  .cal-day { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .cal-item { font-size: 11.5px; padding: 3px 6px; margin-bottom: 3px; border-radius: 4px; background: #eef2ff; color: #3730a3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-item.approved { background: #dcfce7; color: #166534; }
+  .cal-item.published { background: #cffafe; color: #155e75; }
+  .cal-item.in_review { background: #fef3c7; color: #92400e; }
+  .cal-empty { color: #d1d5db; font-style: italic; font-size: 11px; }
+  .cal-today { background: #fef9c3; }
+</style>
+
+<div class="table-card" style="padding: 0">
+  <table class="cal-table">
+    <thead>
+      <tr>
+        <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in grid %}
+        <tr>
+          {% for day in week %}
+            <td class="{% if day == today.day and month == today.month and year == today.year %}cal-today{% endif %}">
+              {% if day %}
+                <div class="cal-day">{{ day }}</div>
+                {% for item in by_day|default_if_none:'' %}
+                {% endfor %}
+                {% with items=by_day|default_if_none:'' %}{% endwith %}
+                {% for k, v in by_day.items %}
+                  {% if k == day %}
+                    {% for item in v %}
+                      <div class="cal-item {{ item.status }}">
+                        {{ item.get_kind_display }}: {{ item.title|truncatechars:20 }}
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endfor %}
+              {% else %}
+                <div class="cal-empty">—</div>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

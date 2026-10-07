@@ -14,6 +14,7 @@ from django.db.models import Q
 
 from .forms import ProspectForm, ProspectImportForm
 from .services import prospect_import as pi
+from django.views.decorators.http import require_POST
 
 
 from leads.decorators import role_required
@@ -622,3 +623,103 @@ def prospect_import_template(request):
                 'Needs an AI chatbot for customer support',
                 'Referred by existing client'])
     return response    
+
+
+
+
+
+# =========================================================================
+# Phase 2.5 — Reactivation Center
+# =========================================================================
+from .services import reactivation as react
+from .services import eligibility as elig
+
+
+@marketing_access
+def reactivation_list(request):
+    days = int(request.GET.get('days', 60))
+    candidates = react.reactivation_candidates(days=days)
+
+    rows = []
+    for lead in candidates:
+        last = react.last_communication(lead)
+        action, reason = react.recommended_next_action(lead)
+        elig_rows = elig.eligibility_summary(lead)
+        rows.append({
+            'lead': lead,
+            'last_at': last[1] if last else None,
+            'last_kind': last[0] if last else None,
+            'action': action,
+            'reason': reason,
+            'eligibility': elig_rows,
+        })
+
+    return render(request, 'marketing/reactivation.html', {
+        'active': 'marketing',
+        'rows': rows,
+        'days': days,
+    })
+    
+
+# =========================================================================
+# Phase 2.6 — Content workflow + calendar
+# =========================================================================
+@marketing_access
+@require_POST
+def content_transition(request, pk, new_status):
+    obj = get_object_or_404(MarketingContent, pk=pk)
+    valid = dict(MarketingContent.STATUS_CHOICES)
+    if new_status not in valid:
+        raise Http404
+    obj.status = new_status
+    if new_status == 'approved':
+        obj.approved_by = request.user
+        obj.approved_at = timezone.now()
+    if new_status == 'published' and not obj.published_at:
+        obj.published_at = timezone.now()
+    obj.save()
+    messages.success(request, f'Content moved to "{valid[new_status]}".')
+    return redirect('marketing:content_list')
+
+
+@marketing_access
+def content_calendar(request):
+    """Calendar view — content grouped by planned_date + published."""
+    from collections import defaultdict
+    from calendar import monthcalendar
+    from datetime import date
+
+    today = timezone.localdate()
+    try:
+        year = int(request.GET.get('year', today.year))
+        month = int(request.GET.get('month', today.month))
+    except ValueError:
+        year, month = today.year, today.month
+
+    first_day = date(year, month, 1)
+    if month == 12:
+        last_day = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = date(year, month + 1, 1) - timedelta(days=1)
+
+    items = MarketingContent.objects.filter(
+        planned_date__gte=first_day, planned_date__lte=last_day
+    ).select_related('campaign').order_by('planned_date', 'kind')
+
+    by_day = defaultdict(list)
+    for it in items:
+        by_day[it.planned_date.day].append(it)
+
+    # grid: list of weeks, each week is list of day numbers (0 for out-of-month)
+    grid = monthcalendar(year, month)
+
+    return render(request, 'marketing/content_calendar.html', {
+        'active': 'marketing',
+        'grid': grid,
+        'by_day': dict(by_day),
+        'year': year,
+        'month': month,
+        'month_name': first_day.strftime('%B'),
+        'today': today,
+        'status_choices': MarketingContent.STATUS_CHOICES,
+    })

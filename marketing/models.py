@@ -140,6 +140,33 @@ class MarketingContent(models.Model):
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+        # Workflow
+    STATUS_DRAFT = 'draft'
+    STATUS_IN_REVIEW = 'in_review'
+    STATUS_APPROVED = 'approved'
+    STATUS_PUBLISHED = 'published'
+    STATUS_ARCHIVED = 'archived'
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, 'Draft'),
+        (STATUS_IN_REVIEW, 'In Review'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_PUBLISHED, 'Published'),
+        (STATUS_ARCHIVED, 'Archived'),
+    ]
+    status = models.CharField(
+        max_length=15, choices=STATUS_CHOICES,
+        default=STATUS_DRAFT, db_index=True,
+    )
+    planned_date = models.DateField(null=True, blank=True, db_index=True)
+    published_url = models.URLField(blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+'
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    ai_generated = models.BooleanField(default=False)
+    ai_model = models.CharField(max_length=80, blank=True)
 
     class Meta:
         ordering = ['campaign', 'kind', 'slug']
@@ -147,6 +174,9 @@ class MarketingContent(models.Model):
             models.UniqueConstraint(fields=['campaign', 'slug'], name='mkt_unique_content_per_campaign'),
         ]
         indexes = [models.Index(fields=['campaign', 'kind', 'is_active'])]
+        
+        indexes = [models.Index(fields=['campaign', 'kind', 'is_active']),
+                   models.Index(fields=['status', 'planned_date']),]
 
     def __str__(self):
         return f'{self.campaign.name} / {self.title}'
@@ -344,3 +374,5 @@ class Referral(models.Model):
 
     def __str__(self):
         return f'Referral {self.referrer_lead_id or self.referrer_label} -> {self.referred_lead_id}'
+    
+    

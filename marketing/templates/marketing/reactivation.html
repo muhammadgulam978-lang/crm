@@ -1,0 +1,82 @@
+{% extends 'leads/base.html' %}
+{% block title %}Reactivation{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Lead Reactivation</h2>
+  <form method="get" style="display:flex;gap:8px">
+    <select name="days" onchange="this.form.submit()" class="form-control" style="max-width:200px">
+      <option value="30" {% if days == 30 %}selected{% endif %}>Dormant 30+ days</option>
+      <option value="60" {% if days == 60 %}selected{% endif %}>Dormant 60+ days</option>
+      <option value="90" {% if days == 90 %}selected{% endif %}>Dormant 90+ days</option>
+      <option value="180" {% if days == 180 %}selected{% endif %}>Dormant 180+ days</option>
+    </select>
+  </form>
+</div>
+{% include 'marketing/_nav.html' with nav='reactivation' %}
+
+<p class="mkt-muted">
+  Leads with no recent activity, marked lost, or stuck in early stages.
+  <strong>{{ rows|length }}</strong> candidate(s).
+</p>
+
+<div class="table-card">
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Lead</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Score</th>
+        <th>Last contact</th>
+        <th>Recommended</th>
+        <th>Eligibility</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>
+            <a href="{% url 'lead_detail' row.lead.pk %}">{{ row.lead.name }}</a>
+            {% if row.lead.business_requirement %}
+              <div class="mkt-muted">{{ row.lead.business_requirement|truncatechars:60 }}</div>
+            {% endif %}
+          </td>
+          <td>{{ row.lead.marketing_source.name|default:"—" }}</td>
+          <td><span class="badge badge-blue">{{ row.lead.get_status_display }}</span></td>
+          <td>{{ row.lead.ai_score }}</td>
+          <td>
+            {% if row.last_at %}
+              {{ row.last_at|date:"d M Y" }}
+              <div class="mkt-muted">{{ row.last_kind }}</div>
+            {% else %}
+              <span class="mkt-muted">never</span>
+            {% endif %}
+          </td>
+          <td>
+            <strong>{{ row.action }}</strong>
+            <div class="mkt-muted">{{ row.reason }}</div>
+          </td>
+          <td>
+            {% for e in row.eligibility %}
+              <span class="badge {% if e.ok %}badge-green{% else %}badge-red{% endif %}"
+                    title="{{ e.reason }}">
+                {{ e.channel }}
+              </span>
+            {% endfor %}
+          </td>
+          <td>
+            <a href="{% url 'lead_detail' row.lead.pk %}">Open</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="8" class="mkt-muted" style="text-align:center">
+            No reactivation candidates in this window.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

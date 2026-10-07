@@ -1,4 +1,4 @@
-{% extends 'leads/base.html' %}
+<!-- {% extends 'leads/base.html' %}
 {% block title %}Marketing Content{% endblock %}
 {% block content %}
 <div class="list-header">
@@ -39,6 +39,89 @@
       {% empty %}
         <tr>
           <td colspan="6" class="mkt-muted" style="text-align:center">
+            No content yet. <a href="{% url 'marketing:content_create' %}">Create one</a>.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %} -->
+
+
+
+
+{% extends 'leads/base.html' %}
+{% block title %}Marketing Content{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Marketing Content</h2>
+  <div style="display:flex;gap:8px">
+    <a class="btn btn-small" href="{% url 'marketing:content_calendar' %}" style="background:#64748b">Calendar view</a>
+    <a class="btn btn-small" href="{% url 'marketing:content_create' %}">+ New content</a>
+  </div>
+</div>
+{% include 'marketing/_nav.html' with nav='content' %}
+
+<form method="get" style="margin-bottom:14px;display:flex;gap:10px">
+  <select name="kind" onchange="this.form.submit()" class="form-control" style="max-width:200px">
+    <option value="">All kinds</option>
+    {% for val, label in kind_choices %}
+      <option value="{{ val }}" {% if kind_filter == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()" class="form-control" style="max-width:200px">
+    <option value="">All statuses</option>
+    {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+<div class="table-card">
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Campaign</th>
+        <th>Kind</th>
+        <th>Planned</th>
+        <th>Status</th>
+        <th>AI</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contents %}
+        <tr>
+          <td>{{ c.title }}</td>
+          <td>{{ c.campaign.name }}</td>
+          <td>{{ c.get_kind_display }}</td>
+          <td>{{ c.planned_date|default:"—" }}</td>
+          <td><span class="badge badge-blue">{{ c.get_status_display }}</span></td>
+          <td>{% if c.ai_generated %}<span class="badge badge-purple">AI</span>{% endif %}</td>
+          <td style="white-space:nowrap">
+            {% if c.status == 'draft' %}
+              <form method="post" action="{% url 'marketing:content_transition' c.pk 'in_review' %}" style="display:inline">{% csrf_token %}
+                <button class="btn btn-small" style="background:#d97706">Send to review</button>
+              </form>
+            {% elif c.status == 'in_review' %}
+              <form method="post" action="{% url 'marketing:content_transition' c.pk 'approved' %}" style="display:inline">{% csrf_token %}
+                <button class="btn btn-small" style="background:#16a34a">Approve</button>
+              </form>
+            {% elif c.status == 'approved' %}
+              <form method="post" action="{% url 'marketing:content_transition' c.pk 'published' %}" style="display:inline">{% csrf_token %}
+                <button class="btn btn-small" style="background:#0891b2">Mark published</button>
+              </form>
+            {% endif %}
+            <a href="{% url 'marketing:content_edit' c.pk %}">Edit</a>
+            &nbsp;·&nbsp;
+            <a href="{% url 'marketing:content_delete' c.pk %}" style="color:#dc2626">Delete</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="7" class="mkt-muted" style="text-align:center">
             No content yet. <a href="{% url 'marketing:content_create' %}">Create one</a>.
           </td>
         </tr>

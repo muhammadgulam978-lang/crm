@@ -56,7 +56,8 @@ class MarketingContentForm(BootstrapMixin, forms.ModelForm):
         model = MarketingContent
         fields = ['campaign', 'kind', 'slug', 'title', 'subject',
                   'body', 'body_html', 'media_url', 'language',
-                  'tags', 'is_active', 'version', 'parent']
+                  'tags', 'is_active', 'version', 'parent'
+                  'status', 'planned_date', 'published_url', 'published_at',]
 
 
 class MarketingConsentForm(BootstrapMixin, forms.ModelForm):
@@ -76,7 +77,10 @@ class SuppressionEntryForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = SuppressionEntry
         fields = ['channel', 'value', 'reason', 'notes', 'expires_at', 'lead']
-        widgets = {'expires_at': forms.DateTimeInput(attrs={'type': 'datetime-local'})}
+        widgets = {'expires_at': forms.DateTimeInput(attrs={'type': 'datetime-local'})
+                   'planned_date': forms.DateInput(attrs={'type': 'date'}),
+                   'published_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+                   }
 
     def clean(self):
         cleaned = super().clean()
