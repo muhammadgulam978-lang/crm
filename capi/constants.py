@@ -3,7 +3,10 @@ PLATFORM_LINKEDIN = 'linkedin'
 PLATFORM_CHOICES = [
     (PLATFORM_META, 'Meta (Conversions API)'),
     (PLATFORM_LINKEDIN, 'LinkedIn (Conversions API)'),
+ 
 ]
+
+META_GRAPH_VERSION = 'v21.0'
 
 # Where a lead originally came from (attribution platform)
 TRACKING_PLATFORM_CHOICES = [

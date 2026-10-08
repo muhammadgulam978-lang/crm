@@ -56,8 +56,8 @@ class MarketingContentForm(BootstrapMixin, forms.ModelForm):
         model = MarketingContent
         fields = ['campaign', 'kind', 'slug', 'title', 'subject',
                   'body', 'body_html', 'media_url', 'language',
-                  'tags', 'is_active', 'version', 'parent'
-                  'status', 'planned_date', 'published_url', 'published_at',]
+                  'tags', 'is_active', 'version', 'parent',
+                  'planned_date', 'published_url', 'published_at',]
 
 
 class MarketingConsentForm(BootstrapMixin, forms.ModelForm):
@@ -77,17 +77,26 @@ class SuppressionEntryForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = SuppressionEntry
         fields = ['channel', 'value', 'reason', 'notes', 'expires_at', 'lead']
-        widgets = {'expires_at': forms.DateTimeInput(attrs={'type': 'datetime-local'})
-                   'planned_date': forms.DateInput(attrs={'type': 'date'}),
-                   'published_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-                   }
+        widgets = {
+            'expires_at': forms.DateTimeInput(
+                attrs={'type': 'datetime-local'}
+            ),
+            'planned_date': forms.DateInput(
+                attrs={'type': 'date'}
+            ),
+            'published_at': forms.DateTimeInput(
+                attrs={'type': 'datetime-local'}
+            ),
+        }
 
     def clean(self):
         cleaned = super().clean()
         ch, val = cleaned.get('channel'), cleaned.get('value')
+
         if ch and val:
             from .services.consent import normalize_value
             cleaned['value'] = normalize_value(ch, val)
+
         return cleaned
 
 
@@ -120,12 +129,11 @@ class AutomationStepForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = AutomationStep
         fields = ['order', 'kind', 'delay_seconds', 'content', 'params']
-        
-        
-        
+            
 # =========================================================================
 # Prospect management
 # =========================================================================
+
 class ProspectForm(BootstrapMixin, forms.ModelForm):
     """Create/edit a prospect — same Lead model, marketing-focused fields."""
     class Meta:

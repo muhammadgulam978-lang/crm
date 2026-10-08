@@ -5,26 +5,59 @@ from .models import ConversionEventConfig, LeadTracking, PlatformConnection
 
 
 class ConnectionForm(forms.ModelForm):
+    # CAPI access token (write-only, encrypted)
     access_token = forms.CharField(
-        required=False, widget=forms.PasswordInput(render_value=False, attrs={'autocomplete': 'new-password'}),
+        required=False,
+        widget=forms.PasswordInput(render_value=False,
+                                    attrs={'autocomplete': 'new-password'}),
         help_text='Stored encrypted. Leave blank to keep the current token.')
     clear_token = forms.BooleanField(required=False, label='Remove stored token')
 
+    # Meta Lead Ads page token (write-only, encrypted)
+    page_access_token = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(render_value=False,
+                                    attrs={'autocomplete': 'new-password'}),
+        help_text='Page Access Token from Meta App. Stored encrypted. Leave blank to keep current.')
+
     class Meta:
         model = PlatformConnection
-        fields = ['is_active', 'name', 'api_version', 'dataset_id', 'test_event_code',
-                  'lead_event_source', 'ad_account_id', 'token_expires_at']
-        widgets = {'token_expires_at': forms.DateTimeInput(attrs={'type': 'datetime-local'},
-                                                           format='%Y-%m-%dT%H:%M')}
+        fields = [
+            'is_active', 'name', 'api_version',
+            'dataset_id', 'test_event_code', 'lead_event_source',
+            'page_id', 'webhook_verify_token', 'webhook_subscribed_at',
+            'ad_account_id', 'token_expires_at',
+        ]
+        widgets = {
+            'token_expires_at': forms.DateTimeInput(
+                attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
+            'webhook_subscribed_at': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'readonly': 'readonly'},
+                format='%Y-%m-%dT%H:%M'),
+        }
 
     def __init__(self, *args, platform=None, **kwargs):
         super().__init__(*args, **kwargs)
         platform = platform or self.instance.platform
-        drop = (['ad_account_id'] if platform == C.PLATFORM_META
-                else ['dataset_id', 'test_event_code', 'lead_event_source'])
+
+        # 1) Set field-level options BEFORE we pop anything
+        if 'token_expires_at' in self.fields:
+            self.fields['token_expires_at'].input_formats = ['%Y-%m-%dT%H:%M']
+        if 'webhook_subscribed_at' in self.fields:
+            self.fields['webhook_subscribed_at'].required = False
+            self.fields['webhook_subscribed_at'].disabled = True
+
+        # 2) Drop platform-specific fields
+        if platform == C.PLATFORM_META:
+            drop = ['ad_account_id']
+        else:
+            drop = ['dataset_id', 'test_event_code', 'lead_event_source',
+                    'page_id', 'webhook_verify_token', 'webhook_subscribed_at',
+                    'page_access_token']
         for f in drop:
-            self.fields.pop(f)
-        self.fields['token_expires_at'].input_formats = ['%Y-%m-%dT%H:%M']
+            self.fields.pop(f, None)
+
+        # 3) Apply Bootstrap class
         for f in self.fields.values():
             if not isinstance(f.widget, forms.CheckboxInput):
                 f.widget.attrs.setdefault('class', 'form-control')
@@ -35,6 +68,11 @@ class ConnectionForm(forms.ModelForm):
             obj.set_token('')
         elif self.cleaned_data.get('access_token'):
             obj.set_token(self.cleaned_data['access_token'])
+
+        page_token = self.cleaned_data.get('page_access_token')
+        if page_token:
+            obj.set_page_token(page_token)
+
         if commit:
             obj.save()
         return obj

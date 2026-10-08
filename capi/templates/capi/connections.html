@@ -15,7 +15,22 @@
         <div class="form-actions"><button class="btn">Save</button></div></form>
       <form method="post" action="{% url 'capi:connection_test' conn.platform %}" style="margin-top:10px">{% csrf_token %}
         <button class="btn btn-small" style="background:#64748b">Test connection</button></form>
-    </div></div>
+    </div>
+  
+  </div>
+
+  <hr style="margin:16px 0">
+<h4 style="margin:0 0 8px">Lead Ads webhook</h4>
+<p class="capi-muted" style="margin:0 0 12px">
+  Add the Page ID, a Page Access Token and a random Webhook Verify Token.
+  Then paste this URL into Meta App Dashboard → Webhooks → Callback URL:
+</p>
+<pre class="capi-pre" style="max-height:none">{{ webhook_url }}</pre>
+<p class="capi-muted" style="margin:8px 0">
+  Subscribe to: <code>leadgen</code> · Verify Token: <code>{{ conn.webhook_verify_token|default:"not set" }}</code>
+</p>
+
+
 {% endfor %}
 </div>
 {% endblock %}

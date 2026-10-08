@@ -1,13 +1,15 @@
 from django.contrib import admin
 
 from .models import (ConversionEvent, ConversionEventConfig, ConversionEventLog,
-                     LeadTouchpoint, LeadTracking, PlatformConnection)
+                     LeadTouchpoint, LeadTracking, PlatformConnection,
+                     MetaWebhookEvent)
 
 
 @admin.register(PlatformConnection)
 class ConnectionAdmin(admin.ModelAdmin):
-    list_display = ('platform', 'is_active', 'health_status', 'token_hint', 'token_expires_at')
-    exclude = ('access_token_enc',)  # token is managed from the Conversion API Center only
+    list_display = ('platform', 'is_active', 'health_status', 'token_hint',
+                    'token_expires_at', 'page_id', 'webhook_subscribed_at')
+    exclude = ('access_token_enc', 'page_access_token_enc')
 
 
 @admin.register(ConversionEventConfig)
@@ -22,6 +24,15 @@ class EventAdmin(admin.ModelAdmin):
     list_filter = ('platform', 'status')
     search_fields = ('lead_label', 'event_id', 'campaign_name')
     readonly_fields = ('request_payload', 'response_body')
+
+
+@admin.register(MetaWebhookEvent)
+class MetaWebhookEventAdmin(admin.ModelAdmin):
+    list_display = ('leadgen_id', 'page_id', 'processed', 'lead', 'created_at')
+    list_filter = ('processed',)
+    search_fields = ('leadgen_id', 'page_id', 'form_id', 'ad_id')
+    readonly_fields = ('leadgen_id', 'page_id', 'form_id', 'ad_id', 'adset_id',
+                       'campaign_id', 'raw_payload', 'created_at')
 
 
 admin.site.register(ConversionEventLog)

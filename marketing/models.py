@@ -376,3 +376,20 @@ class Referral(models.Model):
         return f'Referral {self.referrer_lead_id or self.referrer_label} -> {self.referred_lead_id}'
     
     
+    
+class LinkedInCredential(models.Model):
+    """Stores OAuth tokens for LinkedIn organic posting per CRM user."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='linkedin_credential')
+    access_token = models.TextField()
+    refresh_token = models.TextField(blank=True)
+    token_expiry = models.DateTimeField(null=True, blank=True)
+    linkedin_user_id = models.CharField(max_length=64, blank=True)
+    linkedin_name = models.CharField(max_length=200, blank=True)
+    linkedin_email = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'LinkedIn credentials for {self.user}'
+    
+    

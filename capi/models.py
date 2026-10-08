@@ -17,32 +17,45 @@ class PlatformConnection(models.Model):
         max_length=20, blank=True,
         help_text='Leave blank for the default (Meta e.g. v25.0, LinkedIn e.g. 202606).')
 
-    # Meta
+    # ---- Meta: Conversions API ----
     dataset_id = models.CharField('Dataset / Pixel ID', max_length=64, blank=True)
     test_event_code = models.CharField(max_length=50, blank=True,
                                        help_text='Meta Test Events code. Remove for live traffic.')
     lead_event_source = models.CharField(max_length=100, default='SIS AI CRM')
 
-    # LinkedIn
+    # ---- Meta: Lead Ads webhook ----
+    page_id = models.CharField(
+        'Facebook Page ID', max_length=64, blank=True,
+        help_text='The Facebook Page whose Lead Ads we receive.')
+    page_access_token_enc = models.TextField(
+        blank=True,
+        help_text='Page Access Token (encrypted). Required to fetch lead details.')
+    page_token_hint = models.CharField(max_length=8, blank=True)
+    webhook_verify_token = models.CharField(
+        max_length=64, blank=True,
+        help_text='Random string you set in Meta App > Webhooks. Used for the initial GET handshake.')
+    webhook_subscribed_at = models.DateTimeField(null=True, blank=True)
+
+    # ---- LinkedIn ----
     ad_account_id = models.CharField('Ad account ID', max_length=64, blank=True)
 
-    # Credentials (encrypted at rest; never rendered back to the UI)
+    # ---- Credentials (encrypted at rest; never rendered back to the UI) ----
     access_token_enc = models.TextField(blank=True)
     token_hint = models.CharField(max_length=8, blank=True)
     token_expires_at = models.DateTimeField(null=True, blank=True)
 
-    # API health
+    # ---- API health ----
     health_status = models.CharField(max_length=10, default='unknown')  # unknown / ok / error
     health_message = models.TextField(blank=True)
     last_checked_at = models.DateTimeField(null=True, blank=True)
-    token_invalid = models.BooleanField(default=False)  # set when the API rejects the token
+    token_invalid = models.BooleanField(default=False)
 
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.get_platform_display()
 
-    # ---- credentials ----
+    # ---- CAPI credentials ----
     def set_token(self, raw):
         raw = (raw or '').strip()
         self.access_token_enc = encrypt(raw)
@@ -56,6 +69,15 @@ class PlatformConnection(models.Model):
         env_name = ('CAPI_META_ACCESS_TOKEN' if self.platform == C.PLATFORM_META
                     else 'CAPI_LINKEDIN_ACCESS_TOKEN')
         return getattr(settings, env_name, '') or ''
+
+    # ---- Page Access Token (Lead Ads) ----
+    def set_page_token(self, raw):
+        raw = (raw or '').strip()
+        self.page_access_token_enc = encrypt(raw)
+        self.page_token_hint = raw[-4:] if raw else ''
+
+    def get_page_token(self):
+        return decrypt(self.page_access_token_enc)
 
     @property
     def effective_api_version(self):
@@ -104,6 +126,9 @@ class LeadTracking(models.Model):
     external_lead_id = models.CharField(
         max_length=100, blank=True,
         help_text='Meta Lead Ads lead ID / LinkedIn lead ID from Lead Sync.')
+    meta_leadgen_id = models.CharField(
+        'Meta Lead Ads ID', max_length=32, blank=True, db_index=True,
+        help_text='The leadgen_id returned by the Meta webhook.')
 
     consent_status = models.CharField(max_length=10, choices=C.CONSENT_CHOICES,
                                       default=C.CONSENT_UNKNOWN)
@@ -118,6 +143,15 @@ class LeadTracking(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['meta_leadgen_id'],
+                condition=models.Q(meta_leadgen_id__isnull=False) & ~models.Q(meta_leadgen_id=''),
+                name='capi_unique_meta_leadgen_id',
+            ),
+        ]
 
     def __str__(self):
         return f'Tracking for lead #{self.lead_id}'
@@ -231,13 +265,12 @@ class ConversionEvent(models.Model):
     source_model = models.CharField(max_length=40, blank=True)
     source_id = models.CharField(max_length=40, blank=True)
     dedup_key = models.CharField(max_length=80)
-    event_id = models.CharField(max_length=64, unique=True)  # CRM event ID sent to the platform
+    event_id = models.CharField(max_length=64, unique=True)
     event_name = models.CharField(max_length=100)
     event_time = models.DateTimeField()
     value = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=3, blank=True)
 
-    # attribution snapshot (queryable)
     campaign_id = models.CharField(max_length=100, blank=True)
     campaign_name = models.CharField(max_length=255, blank=True)
     adset_id = models.CharField(max_length=100, blank=True)
@@ -249,8 +282,8 @@ class ConversionEvent(models.Model):
     last_attempt_at = models.DateTimeField(null=True, blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)
 
-    identifiers_used = models.JSONField(default=list, blank=True)   # e.g. ["em","ph","lead_id"]
-    request_payload = models.JSONField(null=True, blank=True)      # hashed identifiers only, no token
+    identifiers_used = models.JSONField(default=list, blank=True)
+    request_payload = models.JSONField(null=True, blank=True)
     response_status = models.IntegerField(null=True, blank=True)
     response_body = models.TextField(blank=True)
     platform_trace_id = models.CharField(max_length=100, blank=True)
@@ -284,3 +317,34 @@ class ConversionEventLog(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class MetaWebhookEvent(models.Model):
+    """
+    One row per POST we receive from Meta. This is the idempotency anchor:
+    if a POST with the same leadgen_id arrives twice, we skip it here.
+    """
+    leadgen_id = models.CharField(max_length=32, unique=True, db_index=True)
+    page_id = models.CharField(max_length=64, blank=True)
+    form_id = models.CharField(max_length=64, blank=True)
+    ad_id = models.CharField(max_length=64, blank=True)
+    adset_id = models.CharField(max_length=64, blank=True)
+    campaign_id = models.CharField(max_length=64, blank=True)
+
+    raw_payload = models.JSONField(default=dict, blank=True)
+    processed = models.BooleanField(default=False, db_index=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    lead = models.ForeignKey(
+        'leads.Lead', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='meta_webhook_events',
+    )
+    error = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Meta Lead Ads event'
+
+    def __str__(self):
+        return f'leadgen {self.leadgen_id}'

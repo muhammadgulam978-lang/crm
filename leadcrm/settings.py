@@ -144,7 +144,7 @@ EMAIL_TIMEOUT = 30
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "crm_db_new",
+        "NAME": "crm_software",
         "USER": "postgres",
         "PASSWORD": "admin",
         "HOST": "localhost",
@@ -202,17 +202,23 @@ META_WHATSAPP_TOKEN = os.getenv('META_WHATSAPP_TOKEN', '')
 META_PHONE_NUMBER_ID = os.getenv('META_PHONE_NUMBER_ID', '')
 META_VERIFY_TOKEN = os.getenv('META_VERIFY_TOKEN', 'hsi123')
 
+# ---------- Meta WhatsApp Calling API ----------
+# Requires: WhatsApp Business Account, Cloud API access, phone number registered
+# for calling in Meta Business Manager (Settings > WhatsApp Accounts > Phone numbers > Calling).
+META_WA_PHONE_NUMBER_ID = os.environ.get('META_WA_PHONE_NUMBER_ID', '')
+META_WA_ACCESS_TOKEN = os.environ.get('META_WA_ACCESS_TOKEN', '')  
+META_WA_API_VERSION = 'v20.0'  
+META_WA_VERIFY_TOKEN = os.environ.get('META_WA_VERIFY_TOKEN', 'change-this-verify-token')
+
+
+LINKEDIN_CLIENT_ID = os.getenv('LINKEDIN_CLIENT_ID', '')
+LINKEDIN_CLIENT_SECRET = os.getenv('LINKEDIN_CLIENT_SECRET', '')
+LINKEDIN_REDIRECT_URI = os.getenv('LINKEDIN_REDIRECT_URI', 'https://www.linkedin.com/developers/tools/oauth/redirect')
 
 
 GOOGLE_REDIRECT_URI = 'http://127.0.0.1:8000/google/callback/'
 
-SITE_BASE_URL = 'http://127.0.0.1:8000'  # Twilio ko recording callback ke liye chahiye — public URL hona zaroori hai
-
-
-# ---------- Base URL ----------
-# Must be a publicly reachable HTTPS URL (Twilio & Meta both need to hit your webhooks).
-# Use ngrok while testing locally, e.g. https://xxxx.ngrok-free.app
-# SITE_BASE_URL = os.environ.get('SITE_BASE_URL', 'https://yourdomain.com')
+SITE_BASE_URL = 'http://127.0.0.1:8000'  
 
 # ---------- Twilio (phone calling) ----------
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
@@ -220,13 +226,6 @@ TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
 TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')  # e.g. +1XXXXXXXXXX
 AGENT_FALLBACK_NUMBER = os.environ.get('AGENT_FALLBACK_NUMBER', '')  # default agent number if none passed
 
-# ---------- Meta WhatsApp Calling API ----------
-# Requires: WhatsApp Business Account, Cloud API access, phone number registered
-# for calling in Meta Business Manager (Settings > WhatsApp Accounts > Phone numbers > Calling).
-META_WA_PHONE_NUMBER_ID = os.environ.get('META_WA_PHONE_NUMBER_ID', '')
-META_WA_ACCESS_TOKEN = os.environ.get('META_WA_ACCESS_TOKEN', '')  # system user permanent token
-META_WA_API_VERSION = 'v20.0'  # bump as Meta releases newer versions
-META_WA_VERIFY_TOKEN = os.environ.get('META_WA_VERIFY_TOKEN', 'change-this-verify-token')  # for webhook verification
 
 # ---------- Google Calendar ----------
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -234,38 +233,12 @@ GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 GOOGLE_REDIRECT_URI = SITE_BASE_URL + 'http://127.0.0.1:8000/google/callback/'
 GOOGLE_SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-# Never hardcode real secrets in settings.py — load them from environment
-# variables or a .env file (python-decouple / django-environ) instead.
-
 
 # Groq AI
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
-# ---------- Twilio (phone calling) ----------
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
-TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '')
-AGENT_FALLBACK_NUMBER = os.getenv('AGENT_FALLBACK_NUMBER', '')
-
-# ---------- Site base URL (used for Twilio/Meta webhooks + Google redirect) ----------
-SITE_BASE_URL = os.getenv('SITE_BASE_URL', 'http://127.0.0.1:8000')
-
-# ---------- Meta WhatsApp Calling API ----------
-META_WA_PHONE_NUMBER_ID = os.getenv('META_WA_PHONE_NUMBER_ID', META_PHONE_NUMBER_ID)
-META_WA_ACCESS_TOKEN = os.getenv('META_WA_ACCESS_TOKEN', META_WHATSAPP_TOKEN)
-META_WA_API_VERSION = 'v20.0'
-META_WA_VERIFY_TOKEN = os.getenv('META_WA_VERIFY_TOKEN', META_VERIFY_TOKEN)
-
-# ---------- Google Calendar ----------
-GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
-GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
-GOOGLE_REDIRECT_URI = SITE_BASE_URL + '/google/callback/'
-GOOGLE_SCOPES = ['https://www.googleapis.com/auth/calendar']
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 
 # ---------- Conversion API Center (Meta CAPI + LinkedIn Conversions API) ----------

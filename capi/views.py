@@ -7,11 +7,11 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 
 from leads.decorators import role_required
 from leads.models import Lead
@@ -19,10 +19,20 @@ from leads.models import Lead
 from . import constants as C
 from .forms import ConfigForm, ConnectionForm, TrackingForm
 from .models import (ConversionEvent, ConversionEventConfig, ConversionEventLog,
-                     LeadTracking, PlatformConnection)
+                     LeadTracking, PlatformConnection, MetaWebhookEvent)
 from .services import linkedin, meta
 from .services import queue as q
+from .services import meta_lead_ads as mla
+from .services import meta_webhook as mwh
 from .services.intake import upsert_lead_from_platform
+
+
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods, require_POST
+from .services import meta_lead_ads as mla
+from .services import meta_webhook as mwh
+from .models import MetaWebhookEvent
 
 # Conversion API Center is restricted to admins / CEO (superusers always pass).
 capi_admin = role_required('admin', 'ceo')
@@ -97,9 +107,15 @@ def connections(request):
         else:
             form = ConnectionForm(instance=conn, platform=platform)
         forms[platform] = (conn, form, label)
-    return render(request, 'capi/connections.html', _ctx({'forms': forms.values()}))
 
-
+    webhook_url = request.build_absolute_uri('/capi/webhook/meta/')
+    return render(request, 'capi/connections.html', _ctx({
+        'forms': forms.values(),
+        'webhook_url': webhook_url,
+    }))
+    
+    
+    
 @capi_admin
 @require_POST
 def connection_test(request, platform):
@@ -259,3 +275,53 @@ def intake(request, platform):
         platform, name=data.get('name', ''), email=data.get('email', ''), phone=data.get('phone', ''),
         company=data.get('company', ''), consent=consent, **fields)
     return JsonResponse({'lead_id': lead.pk, 'created': created}, status=201 if created else 200)
+
+
+
+
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def meta_webhook(request):
+    """GET: Meta verification handshake. POST: Meta Lead Ads notification."""
+    if request.method == 'GET':
+        mode = request.GET.get('hub.mode', '')
+        token = request.GET.get('hub.verify_token', '')
+        challenge = request.GET.get('hub.challenge', '')
+        conn = PlatformConnection.objects.filter(
+            platform='meta', webhook_verify_token=token
+        ).first()
+        expected = conn.webhook_verify_token if conn else ''
+        result = mla.check_handshake(mode, token, challenge, expected)
+        if result is None:
+            return HttpResponse('forbidden', status=403)
+        return HttpResponse(result, content_type='text/plain')
+
+    raw_body = request.body
+    signature = request.headers.get('X-Hub-Signature-256', '')
+    outcome = mwh.process_payload(raw_body, signature)
+    if not outcome['ok']:
+        return JsonResponse(outcome, status=401)
+    return JsonResponse(outcome, status=200)
+
+
+@capi_admin
+@require_POST
+def meta_subscribe_page(request):
+    """Ask Meta to start sending leadgen events for the configured page."""
+    conn = _conn('meta')
+    if not (conn.page_id and conn.get_page_token()):
+        messages.error(request, 'Set the Page ID and Page Access Token first.')
+        return redirect('capi:connections')
+    ok, msg = mla.subscribe_page(
+        conn.page_id, conn.get_page_token(),
+        api_version=getattr(settings, 'META_GRAPH_VERSION', 'v21.0'),
+    )
+    if ok:
+        conn.webhook_subscribed_at = timezone.now()
+        conn.save(update_fields=['webhook_subscribed_at'])
+        messages.success(request, 'Page subscribed to leadgen webhooks.')
+    else:
+        messages.error(request, f'Subscription failed: {msg}')
+    return redirect('capi:connections')

@@ -20,4 +20,7 @@ urlpatterns = [
     path('logs/', views.log_list, name='log_list'),
     path('leads/<int:lead_id>/tracking/', views.lead_tracking, name='lead_tracking'),
     path('intake/<str:platform>/', views.intake, name='intake'),
+    
+    path('webhook/meta/', views.meta_webhook, name='meta_webhook'),
+    path('connections/meta/subscribe/', views.meta_subscribe_page, name='meta_subscribe_page'),
 ]
