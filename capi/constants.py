@@ -6,7 +6,6 @@ PLATFORM_CHOICES = [
  
 ]
 
-META_GRAPH_VERSION = 'v21.0'
 
 # Where a lead originally came from (attribution platform)
 TRACKING_PLATFORM_CHOICES = [
@@ -75,3 +74,7 @@ STATUS_CHOICES = [
 RETRY_BACKOFF = [60, 300, 1800, 7200, 43200]
 MAX_ATTEMPTS = 5
 META_MAX_EVENT_AGE_DAYS = 7
+
+# ---- Meta Lead Ads webhook: retry schedule (seconds before attempt N+1) ----
+WEBHOOK_RETRY_BACKOFF = [60, 300, 1800, 7200, 43200]
+WEBHOOK_MAX_ATTEMPTS = 6

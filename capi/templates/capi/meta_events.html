@@ -1,0 +1,32 @@
+{% extends 'leads/base.html' %}
+{% block title %}Meta Lead Ads{% endblock %}
+{% block content %}
+<div class="list-header"><h2 class="page-title">Meta Lead Ads — received leads</h2>
+  <form method="post" action="{% url 'capi:meta_retry_all' %}" class="capi-inline">{% csrf_token %}
+    <button class="btn btn-small">Retry due now</button></form></div>
+{% include 'capi/_nav.html' with nav='leadads' %}
+<form method="get" class="filter-card" style="margin-bottom:14px"><div class="filter-row">
+  <input class="form-control" name="q" value="{{ search }}" placeholder="Search Meta lead ID, campaign, form, lead name">
+  <select class="form-control" name="state">
+    <option value="">All</option>
+    <option value="imported" {% if state == 'imported' %}selected{% endif %}>Imported</option>
+    <option value="retrying" {% if state == 'retrying' %}selected{% endif %}>Waiting for retry</option>
+    <option value="failed" {% if state == 'failed' %}selected{% endif %}>Gave up</option>
+  </select><button class="btn btn-small">Filter</button></div></form>
+<div class="table-card"><table class="items-table"><thead><tr>
+  <th>Received</th><th>Meta lead ID</th><th>Lead</th><th>Campaign</th><th>Form</th><th>Status</th><th>Tries</th><th>Error</th><th></th></tr></thead><tbody>
+{% for e in page_obj %}<tr>
+  <td>{{ e.created_at|date:"d M, H:i" }}</td>
+  <td class="capi-mono">{{ e.leadgen_id }}</td>
+  <td>{% if e.lead %}<a href="{% url 'lead_detail' e.lead_id %}">{{ e.lead.name }}</a>{% else %}—{% endif %}</td>
+  <td>{{ e.campaign_id|default:"—" }}</td><td>{{ e.form_id|default:"—" }}</td>
+  <td>{% if e.processed %}<span class="badge badge-green">imported</span>{% elif e.gave_up %}<span class="badge badge-red">gave up</span>{% else %}<span class="badge badge-orange">retrying</span>{% endif %}</td>
+  <td>{{ e.attempts }}</td><td class="capi-muted">{{ e.error|truncatechars:90 }}</td>
+  <td>{% if not e.processed %}<form method="post" action="{% url 'capi:meta_event_retry' e.pk %}" class="capi-inline">{% csrf_token %}<button class="btn btn-small">Retry</button></form>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="9" class="capi-muted">No Meta lead notifications received yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% if page_obj.has_other_pages %}<div class="pagination">
+  {% if page_obj.has_previous %}<a href="?state={{ state }}&q={{ search }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+  <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}<a href="?state={{ state }}&q={{ search }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}</div>{% endif %}
+{% endblock %}

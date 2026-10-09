@@ -10,16 +10,46 @@ Responsibilities:
 """
 import hashlib
 import hmac
-import json
 import logging
+import re
 
 import requests
-from django.conf import settings
+
+from capi import conf
 
 logger = logging.getLogger(__name__)
 
 GRAPH_BASE = 'https://graph.facebook.com'
 TIMEOUT = 20
+DEFAULT_VERSION = 'v25.0'
+
+LEAD_FIELDS_BASE = 'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id'
+LEAD_FIELDS_EXTENDED = LEAD_FIELDS_BASE + ',ad_name,adset_name,campaign_name'
+
+
+# ---------------------------------------------------------------- secrets hygiene
+
+_TOKEN_RE = re.compile(r'(access_token|appsecret_proof|client_secret)=[^&\s\'"]+', re.I)
+
+
+def redact(text, *secrets):
+    """Remove tokens from anything that may be stored or logged (requests puts the
+    full URL, query string included, into its exception messages)."""
+    text = _TOKEN_RE.sub(r'\1=[redacted]', str(text or ''))
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, '[redacted]')
+    return text
+
+
+def appsecret_proof(access_token):
+    """Graph 'appsecret_proof' = HMAC-SHA256(access_token, app_secret). Proves the call
+    comes from our server; required if 'Require App Secret' is on for the Meta app."""
+    secret = conf.get('META_APP_SECRET')
+    if not (secret and access_token):
+        return {}
+    return {'appsecret_proof': hmac.new(secret.encode(), access_token.encode(),
+                                        hashlib.sha256).hexdigest()}
 
 
 # ---------------------------------------------------------------- handshake
@@ -54,33 +84,41 @@ def verify_signature(raw_body, signature_header, app_secret):
 
 # ---------------------------------------------------------------- graph fetch
 
-def fetch_lead(leadgen_id, page_access_token, api_version='v21.0'):
-    """GET /{leadgen_id}. Returns (ok, data_or_error)."""
-    url = f'{GRAPH_BASE}/{api_version}/{leadgen_id}'
-    try:
-        r = requests.get(
-            url,
-            params={
-                'access_token': page_access_token,
-                'fields': 'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id',
-            },
-            timeout=TIMEOUT,
-        )
-    except requests.RequestException as exc:
-        logger.exception('Meta fetch_lead network error')
-        return False, str(exc)
-
+def _graph_error(r, token):
     try:
         data = r.json()
     except ValueError:
-        return False, f'Non-JSON response (HTTP {r.status_code})'
+        return None, f'Non-JSON response (HTTP {r.status_code})'
+    return data, None
 
+
+def _fetch(leadgen_id, page_access_token, api_version, fields):
+    url = f'{GRAPH_BASE}/{api_version}/{leadgen_id}'
+    params = {'access_token': page_access_token, 'fields': fields,
+              **appsecret_proof(page_access_token)}
+    try:
+        r = requests.get(url, params=params, timeout=TIMEOUT)
+    except requests.RequestException as exc:
+        return False, redact(exc, page_access_token), None
+    data, err = _graph_error(r, page_access_token)
+    if err:
+        return False, err, None
     if r.status_code == 200 and 'error' not in data:
-        return True, data
-    err = data.get('error', {}) if isinstance(data, dict) else {}
-    msg = err.get('message') or f'HTTP {r.status_code}'
-    code = err.get('code')
-    return False, f'{msg} (code={code})'
+        return True, data, None
+    e = data.get('error', {}) if isinstance(data, dict) else {}
+    code = e.get('code')
+    return False, redact(f"{e.get('message') or f'HTTP {r.status_code}'} (code={code})",
+                         page_access_token), code
+
+
+def fetch_lead(leadgen_id, page_access_token, api_version=DEFAULT_VERSION):
+    """GET /{leadgen_id}. Returns (ok, data_or_error_text).
+    Asks for the campaign / ad set / ad NAMES too; if Graph rejects an optional field
+    (error 100) it transparently falls back to the base field list."""
+    ok, data, code = _fetch(leadgen_id, page_access_token, api_version, LEAD_FIELDS_EXTENDED)
+    if not ok and code == 100:
+        ok, data, code = _fetch(leadgen_id, page_access_token, api_version, LEAD_FIELDS_BASE)
+    return ok, data
 
 
 # ---------------------------------------------------------------- parsing
@@ -116,12 +154,17 @@ def parse_field_data(field_data):
     for item in field_data or []:
         key = (item.get('name') or '').strip().lower()
         values = item.get('values') or []
-        value = (values[0] if values else '').strip() if values else ''
+        value = (values[0] if values else '')
+        value = (value or '').strip()
         if not key:
             continue
         out['_raw'][key] = value
+        if len(values) > 1:
+            out['_raw'][key] = ', '.join(v.strip() for v in values if v)
         canonical = FIELD_ALIASES.get(key)
-        if canonical and canonical not in out:
+        if canonical == 'contact_number':
+            value = re.sub(r'^p:\s*', '', value)      # Meta exports prefix phones with "p:"
+        if canonical and not out.get(canonical):
             out[canonical] = value
     # If first_name + last_name given but no full name, compose it
     if not out.get('name') and (out.get('first_name') or out.get('last_name')):
@@ -131,17 +174,18 @@ def parse_field_data(field_data):
 
 # ---------------------------------------------------------------- subscription
 
-def subscribe_page(page_id, page_access_token, api_version='v21.0'):
+def subscribe_page(page_id, page_access_token, api_version=DEFAULT_VERSION):
     """POST /{page_id}/subscribed_apps — enables leadgen webhooks for this page."""
     url = f'{GRAPH_BASE}/{api_version}/{page_id}/subscribed_apps'
     try:
         r = requests.post(
             url,
-            data={'subscribed_fields': 'leadgen', 'access_token': page_access_token},
+            data={'subscribed_fields': 'leadgen', 'access_token': page_access_token,
+                  **appsecret_proof(page_access_token)},
             timeout=TIMEOUT,
         )
     except requests.RequestException as exc:
-        return False, str(exc)
+        return False, redact(exc, page_access_token)
     try:
         data = r.json()
     except ValueError:
@@ -152,13 +196,41 @@ def subscribe_page(page_id, page_access_token, api_version='v21.0'):
     return False, err.get('message') or f'HTTP {r.status_code}'
 
 
-def list_subscriptions(page_id, page_access_token, api_version='v21.0'):
+def list_subscriptions(page_id, page_access_token, api_version=DEFAULT_VERSION):
     """GET /{page_id}/subscribed_apps — check current subscription state."""
     url = f'{GRAPH_BASE}/{api_version}/{page_id}/subscribed_apps'
     try:
-        r = requests.get(url, params={'access_token': page_access_token}, timeout=TIMEOUT)
+        r = requests.get(url, params={'access_token': page_access_token,
+                                      **appsecret_proof(page_access_token)}, timeout=TIMEOUT)
     except requests.RequestException as exc:
-        return False, str(exc)
+        return False, redact(exc, page_access_token)
+    try:
+        data = r.json()
+    except ValueError:
+        return False, f'Non-JSON response (HTTP {r.status_code})'
     if r.status_code != 200:
-        return False, f'HTTP {r.status_code}'
-    return True, r.json().get('data', [])
+        return False, redact((data.get('error') or {}).get('message') or f'HTTP {r.status_code}',
+                             page_access_token)
+    return True, data.get('data', [])
+
+
+def page_has_leadgen_subscription(subscriptions):
+    return any('leadgen' in (item.get('subscribed_fields') or []) for item in subscriptions or [])
+
+
+def check_page(page_id, page_access_token, api_version=DEFAULT_VERSION):
+    """GET /{page_id}?fields=id,name - validates the Page token. Returns (ok, message)."""
+    try:
+        r = requests.get(f'{GRAPH_BASE}/{api_version}/{page_id}',
+                         params={'fields': 'id,name', 'access_token': page_access_token,
+                                 **appsecret_proof(page_access_token)}, timeout=TIMEOUT)
+    except requests.RequestException as exc:
+        return False, redact(exc, page_access_token)
+    try:
+        data = r.json()
+    except ValueError:
+        return False, f'Non-JSON response (HTTP {r.status_code})'
+    if r.status_code == 200:
+        return True, f"Page reachable ({data.get('name', page_id)})."
+    return False, redact((data.get('error') or {}).get('message') or f'HTTP {r.status_code}',
+                         page_access_token)

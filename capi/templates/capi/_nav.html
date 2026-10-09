@@ -11,6 +11,7 @@
 <div class="capi-nav">
   <a href="{% url 'capi:dashboard' %}" class="{% if nav == 'dashboard' %}on{% endif %}">Dashboard</a>
   <a href="{% url 'capi:connections' %}" class="{% if nav == 'connections' %}on{% endif %}">Connections</a>
+  <a href="{% url 'capi:meta_event_list' %}" class="{% if nav == 'leadads' %}on{% endif %}">Lead Ads</a>
   <a href="{% url 'capi:config_list' %}" class="{% if nav == 'mapping' %}on{% endif %}">Event mapping</a>
   <a href="{% url 'capi:event_list' %}?tab=queue" class="{% if nav == 'queue' %}on{% endif %}">Queue</a>
   <a href="{% url 'capi:event_list' %}?tab=sent" class="{% if nav == 'sent' %}on{% endif %}">Sent</a>

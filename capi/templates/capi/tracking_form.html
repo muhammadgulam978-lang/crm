@@ -6,6 +6,6 @@
 <p class="capi-muted">Conversions are only sent for this lead when consent is “Granted” (per mapping) and the platform matches.</p>
 <form method="post">{% csrf_token %}{% include 'capi/_form_fields.html' %}
 <div class="form-actions"><a href="{% url 'lead_detail' lead.pk %}">Cancel</a><button class="btn">Save</button></div></form></div></div>
-{% if touchpoints %}<h3 style="margin-top:20px">Ad touchpoints</h3><div class="table-card"><table class="items-table"><thead><tr><th>When</th><th>Platform</th><th>Campaign</th><th>Ad set</th><th>Ad</th><th>Form</th></tr></thead><tbody>
-{% for t in touchpoints %}<tr><td>{{ t.created_at|date:"d M Y" }}</td><td>{{ t.platform }}</td><td>{{ t.campaign_name|default:t.campaign_id }}</td><td>{{ t.adset_id }}</td><td>{{ t.ad_id }}</td><td>{{ t.form_id }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% if touchpoints %}<h3 style="margin-top:20px">Ad touchpoints</h3><div class="table-card"><table class="items-table"><thead><tr><th>When</th><th>Platform</th><th>Campaign</th><th>Ad set</th><th>Ad</th><th>Form</th><th>Form answers</th></tr></thead><tbody>
+{% for t in touchpoints %}<tr><td>{{ t.created_at|date:"d M Y" }}</td><td>{{ t.platform }}</td><td>{{ t.campaign_name|default:t.campaign_id }}</td><td>{{ t.adset_name|default:t.adset_id }}</td><td>{{ t.ad_name|default:t.ad_id }}</td><td>{{ t.form_id }}</td><td class="capi-muted">{% for q, a in t.form_answers.items %}{{ q }}: {{ a }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
 {% endblock %}

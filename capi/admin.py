@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from .models import (ConversionEvent, ConversionEventConfig, ConversionEventLog,
                      LeadTouchpoint, LeadTracking, PlatformConnection,
-                     MetaWebhookEvent)
+                     MetaWebhookEvent, LinkedInWebhookEvent)
 
 
 @admin.register(PlatformConnection)
@@ -33,6 +33,20 @@ class MetaWebhookEventAdmin(admin.ModelAdmin):
     search_fields = ('leadgen_id', 'page_id', 'form_id', 'ad_id')
     readonly_fields = ('leadgen_id', 'page_id', 'form_id', 'ad_id', 'adset_id',
                        'campaign_id', 'raw_payload', 'created_at')
+
+
+@admin.register(LinkedInWebhookEvent)
+class LinkedInWebhookEventAdmin(admin.ModelAdmin):
+    
+    list_display = ('lead_urn', 'linkedin_lead_id', 'form_urn', 'owner_urn',
+                    'processed', 'lead', 'created_at')
+    list_filter = ('processed',)
+    search_fields = ('lead_urn', 'linkedin_lead_id', 'form_urn', 'form_id',
+                     'owner_urn', 'campaign_urn')
+    
+    readonly_fields = ('lead_urn', 'linkedin_lead_id', 'form_urn', 'form_id', 'owner_urn',
+                       'campaign_urn', 'creative_urn', 'share_urn',
+                       'raw_payload', 'created_at')
 
 
 admin.site.register(ConversionEventLog)

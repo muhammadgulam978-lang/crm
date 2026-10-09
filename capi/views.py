@@ -11,28 +11,29 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.urls import reverse
 from django.views.decorators.http import require_POST, require_http_methods
 
 from leads.decorators import role_required
 from leads.models import Lead
 
+from . import conf
 from . import constants as C
 from .forms import ConfigForm, ConnectionForm, TrackingForm
+
+
+
 from .models import (ConversionEvent, ConversionEventConfig, ConversionEventLog,
-                     LeadTracking, PlatformConnection, MetaWebhookEvent)
+                     LeadTracking, PlatformConnection, MetaWebhookEvent,
+                     LinkedInWebhookEvent)
 from .services import linkedin, meta
 from .services import queue as q
 from .services import meta_lead_ads as mla
 from .services import meta_webhook as mwh
+from .services import linkedin_lead_ads as lla
+from .services import linkedin_webhook as lwh
 from .services.intake import upsert_lead_from_platform
 
-
-from django.http import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods, require_POST
-from .services import meta_lead_ads as mla
-from .services import meta_webhook as mwh
-from .models import MetaWebhookEvent
 
 # Conversion API Center is restricted to admins / CEO (superusers always pass).
 capi_admin = role_required('admin', 'ceo')
@@ -108,14 +109,58 @@ def connections(request):
             form = ConnectionForm(instance=conn, platform=platform)
         forms[platform] = (conn, form, label)
 
-    webhook_url = request.build_absolute_uri('/capi/webhook/meta/')
     return render(request, 'capi/connections.html', _ctx({
         'forms': forms.values(),
-        'webhook_url': webhook_url,
+        'meta': meta_status(request),
     }))
-    
-    
-    
+
+
+def meta_status(request):
+    """Everything the admin needs to see to know whether Lead Ads are flowing."""
+    conn = _conn(C.PLATFORM_META)
+    events = MetaWebhookEvent.objects
+    since = timezone.now() - timedelta(days=30)
+    recent = events.filter(created_at__gte=since)
+    last = events.order_by('-created_at').first()
+    verify_set = bool(conn.webhook_verify_token or conn_env_verify())
+    checks = [
+        ('Meta App Secret (META_APP_SECRET)', bool(conf.get('META_APP_SECRET')),
+         'Needed to verify X-Hub-Signature-256 on every webhook POST.'),
+        ('Facebook Page ID', bool(conn.page_id), ''),
+        ('Page Access Token', bool(conn.get_page_token()), 'Needed to fetch lead details.'),
+        ('Webhook verify token', verify_set, 'Used for the one-time GET handshake.'),
+        ('Webhook verified by Meta', bool(conn.webhook_verified_at), ''),
+        ('Page subscribed to leadgen', bool(conn.webhook_subscribed_at), ''),
+        ('Conversions API token + dataset', conn.is_configured, 'For sending events back (CAPI).'),
+    ]
+    return {
+        'conn': conn,
+        'webhook_url': settings_webhook_url(request),
+        'checks': checks,
+        'ready': all(ok for _, ok, _ in checks[:4]),
+        'counts': {
+            'received': recent.count(),
+            'imported': recent.filter(processed=True).count(),
+            'retrying': events.filter(processed=False, gave_up=False).count(),
+            'gave_up': events.filter(processed=False, gave_up=True).count(),
+        },
+        'last_event': last,
+        'recent': events.select_related('lead')[:10],
+    }
+
+
+def conn_env_verify():
+    return conf.get('META_WEBHOOK_VERIFY_TOKEN')
+
+
+def settings_webhook_url(request):
+    """Callback URL to paste into Meta. Set CAPI_PUBLIC_BASE_URL (https://crm.example.com)
+    when running behind a proxy that hides the public scheme/host."""
+    base = conf.get('CAPI_PUBLIC_BASE_URL')
+    path = reverse('capi:meta_webhook')
+    return f'{base.rstrip("/")}{path}' if base else request.build_absolute_uri(path)
+
+
 @capi_admin
 @require_POST
 def connection_test(request, platform):
@@ -224,6 +269,9 @@ def event_action(request, pk, action):
 @require_POST
 def process_now(request):
     counts = q.process_queue()
+    leads = mwh.retry_due()
+    if leads['processed']:
+        counts['leads imported'] = leads['processed']
     messages.success(request, 'Queue processed: ' + ', '.join(f'{v} {k}' for k, v in counts.items() if v)
                      if any(counts.values()) else 'Nothing due in the queue.')
     return redirect(request.META.get('HTTP_REFERER') or 'capi:dashboard')
@@ -269,59 +317,184 @@ def intake(request, platform):
     if not (data.get('email') or data.get('phone')):
         return JsonResponse({'error': 'email or phone required'}, status=400)
     consent = {True: C.CONSENT_GRANTED, False: C.CONSENT_DENIED}.get(data.get('consent'))
-    fields = {k: data.get(k) for k in ('campaign_id', 'campaign_name', 'adset_id', 'ad_id', 'form_id',
-                                       'external_lead_id', 'fbc', 'fbp', 'li_fat_id')}
+    fields = {k: data.get(k) for k in ('campaign_id', 'campaign_name', 'adset_id', 'adset_name', 'ad_id',
+                                       'ad_name', 'page_id', 'form_id', 'external_lead_id',
+                                       'fbc', 'fbp', 'li_fat_id')}
+    answers = data.get('form_answers')
+    fields['form_answers'] = answers if isinstance(answers, dict) else {}
     lead, created = upsert_lead_from_platform(
         platform, name=data.get('name', ''), email=data.get('email', ''), phone=data.get('phone', ''),
         company=data.get('company', ''), consent=consent, **fields)
     return JsonResponse({'lead_id': lead.pk, 'created': created}, status=201 if created else 200)
 
+###########################################
+############################################
+############################################
 
-
-
-
+from .models import (ConversionEvent, ConversionEventConfig, ConversionEventLog,
+                     LeadTracking, PlatformConnection, MetaWebhookEvent,
+                     LinkedInWebhookEvent)
+from .services import linkedin_lead_ads as lla
+from .services import linkedin_webhook as lwh
 
 @csrf_exempt
 @require_http_methods(['GET', 'POST'])
 def meta_webhook(request):
-    """GET: Meta verification handshake. POST: Meta Lead Ads notification."""
+    """GET: Meta verification handshake. POST: signed Meta Lead Ads notification."""
     if request.method == 'GET':
         mode = request.GET.get('hub.mode', '')
         token = request.GET.get('hub.verify_token', '')
         challenge = request.GET.get('hub.challenge', '')
-        conn = PlatformConnection.objects.filter(
-            platform='meta', webhook_verify_token=token
-        ).first()
-        expected = conn.webhook_verify_token if conn else ''
-        result = mla.check_handshake(mode, token, challenge, expected)
-        if result is None:
-            return HttpResponse('forbidden', status=403)
-        return HttpResponse(result, content_type='text/plain')
+        conn = PlatformConnection.objects.filter(platform=C.PLATFORM_META).first()
+        for expected in (conn.webhook_verify_token if conn else '', conn_env_verify()):
+            result = mla.check_handshake(mode, token, challenge, expected)
+            if result is not None:
+                if conn:
+                    PlatformConnection.objects.filter(pk=conn.pk).update(webhook_verified_at=timezone.now())
+                return HttpResponse(result, content_type='text/plain')
+        return HttpResponse('forbidden', status=403)
 
-    raw_body = request.body
-    signature = request.headers.get('X-Hub-Signature-256', '')
-    outcome = mwh.process_payload(raw_body, signature)
+    outcome = mwh.process_payload(request.body, request.headers.get('X-Hub-Signature-256', ''))
     if not outcome['ok']:
-        return JsonResponse(outcome, status=401)
+        return JsonResponse({'ok': False, 'errors': outcome['errors']}, status=401)
     return JsonResponse(outcome, status=200)
 
 
 @capi_admin
 @require_POST
 def meta_subscribe_page(request):
-    """Ask Meta to start sending leadgen events for the configured page."""
-    conn = _conn('meta')
-    if not (conn.page_id and conn.get_page_token()):
+    """Ask Meta to start sending leadgen events for the configured page, then confirm it."""
+    conn = _conn(C.PLATFORM_META)
+    token = conn.get_page_token()
+    if not (conn.page_id and token):
         messages.error(request, 'Set the Page ID and Page Access Token first.')
         return redirect('capi:connections')
-    ok, msg = mla.subscribe_page(
-        conn.page_id, conn.get_page_token(),
-        api_version=getattr(settings, 'META_GRAPH_VERSION', 'v21.0'),
-    )
-    if ok:
-        conn.webhook_subscribed_at = timezone.now()
-        conn.save(update_fields=['webhook_subscribed_at'])
-        messages.success(request, 'Page subscribed to leadgen webhooks.')
-    else:
+    version = conn.effective_api_version
+    ok, msg = mla.subscribe_page(conn.page_id, token, api_version=version)
+    if not ok:
         messages.error(request, f'Subscription failed: {msg}')
+        return redirect('capi:connections')
+    good, subs = mla.list_subscriptions(conn.page_id, token, api_version=version)
+    if good and not mla.page_has_leadgen_subscription(subs):
+        messages.error(request, 'Meta accepted the call but the Page is not subscribed to "leadgen". '
+                                'Check the app has leads_retrieval + pages_manage_metadata.')
+        return redirect('capi:connections')
+    conn.webhook_subscribed_at = timezone.now()
+    conn.save(update_fields=['webhook_subscribed_at'])
+    messages.success(request, 'Page subscribed to leadgen webhooks.')
+    return redirect('capi:connections')
+
+
+@capi_admin
+@require_POST
+def meta_page_test(request):
+    """Validate the Page token and the leadgen subscription without importing anything."""
+    conn = _conn(C.PLATFORM_META)
+    token = conn.get_page_token()
+    if not (conn.page_id and token):
+        messages.error(request, 'Set the Page ID and Page Access Token first.')
+        return redirect('capi:connections')
+    ok, msg = mla.check_page(conn.page_id, token, api_version=conn.effective_api_version)
+    if ok:
+        good, subs = mla.list_subscriptions(conn.page_id, token, api_version=conn.effective_api_version)
+        subscribed = good and mla.page_has_leadgen_subscription(subs)
+        msg += ' Subscribed to leadgen.' if subscribed else ' NOT subscribed to leadgen yet.'
+        ok = subscribed
+    (messages.success if ok else messages.error)(request, f'Facebook Page: {msg}')
+    return redirect('capi:connections')
+
+
+@capi_admin
+def meta_event_list(request):
+    state = request.GET.get('state', '')
+    qs = MetaWebhookEvent.objects.select_related('lead')
+    if state == 'imported':
+        qs = qs.filter(processed=True)
+    elif state == 'retrying':
+        qs = qs.filter(processed=False, gave_up=False)
+    elif state == 'failed':
+        qs = qs.filter(processed=False, gave_up=True)
+    search = request.GET.get('q', '').strip()
+    if search:
+        qs = qs.filter(Q(leadgen_id__icontains=search) | Q(campaign_id__icontains=search)
+                       | Q(form_id__icontains=search) | Q(lead__name__icontains=search))
+    page = Paginator(qs, 25).get_page(request.GET.get('page'))
+    return render(request, 'capi/meta_events.html', _ctx({'page_obj': page, 'state': state, 'search': search}))
+
+
+@capi_admin
+@require_POST
+def meta_event_retry(request, pk):
+    ev = get_object_or_404(MetaWebhookEvent, pk=pk)
+    outcome = mwh.reset_and_process(ev)
+    ev.refresh_from_db()
+    if outcome == 'processed':
+        messages.success(request, f'Lead {ev.leadgen_id} imported.')
+    elif outcome == 'skipped':
+        messages.info(request, 'Already imported.')
+    else:
+        messages.error(request, f'Still failing: {ev.error or outcome}')
+    return redirect(request.META.get('HTTP_REFERER') or 'capi:meta_event_list')
+
+
+@capi_admin
+@require_POST
+def meta_retry_all(request):
+    counts = mwh.retry_due()
+    messages.success(request, 'Lead Ads retry: ' + ', '.join(f'{v} {k}' for k, v in counts.items() if v)
+                     if any(counts.values()) else 'Nothing due for retry.')
+    return redirect('capi:meta_event_list')
+
+
+# --------------------------------------------------------------- LinkedIn webhook
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def linkedin_webhook(request):
+    """
+    GET  -> acknowledge (LinkedIn may probe the URL).
+    POST -> challenge handshake OR lead notification(s).
+    """
+    if request.method == 'GET':
+        return HttpResponse('ok', content_type='text/plain')
+
+    raw_body = request.body
+    try:
+        body = json.loads(raw_body or b'{}')
+    except ValueError:
+        return JsonResponse({'error': 'invalid json'}, status=400)
+
+    # 1) Challenge verification
+    is_challenge, response = lwh.handle_challenge(body)
+    if is_challenge:
+        return JsonResponse(response, status=200)
+
+    # 2) Optional signature check (LinkedIn doesn't sign by default)
+    signature = request.headers.get('X-LI-Signature', '')
+    secret = (getattr(settings, 'CAPI_LINKEDIN_CLIENT_SECRET', '')
+              or getattr(settings, 'LINKEDIN_CLIENT_SECRET', ''))
+    if signature and not lla.verify_webhook_payload(raw_body, signature, secret):
+        return JsonResponse({'error': 'signature_mismatch'}, status=401)
+
+    outcome = lwh.process_payload(raw_body)
+    return JsonResponse(outcome, status=200 if outcome['ok'] else 400)
+
+
+# --------------------------------------------------------------- LinkedIn Lead Sync test
+@capi_admin
+@require_POST
+def linkedin_leadsync_test(request):
+    conn = _conn(C.PLATFORM_LINKEDIN)
+    if not conn.is_configured or not conn.linkedin_organization_urn:
+        ok, msg, token_bad = False, 'Set the access token and Organization URN first.', False
+    else:
+        ok, msg, token_bad = lla.check_health(conn)
+    conn.health_status = 'ok' if ok else 'error'
+    conn.health_message = msg[:500]
+    conn.last_checked_at = timezone.now()
+    if ok:
+        conn.token_invalid = False
+    elif token_bad:
+        conn.token_invalid = True
+    conn.save()
+    (messages.success if ok else messages.error)(request, f'{conn}: {msg}')
     return redirect('capi:connections')

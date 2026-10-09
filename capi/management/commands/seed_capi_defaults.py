@@ -8,6 +8,8 @@ DEFAULTS = [
     ('Lead', C.TRIGGER_LEAD_CREATED, '', '', 'Lead', False),
     ('Qualified Lead', C.TRIGGER_OPP_STAGE, '', 'qualified', 'QualifiedLead', False),
     ('Appointment', C.TRIGGER_MEETING, '', '', 'Appointment', False),
+    ('Meeting Booked', C.TRIGGER_MEETING, '', '', 'Meeting', False),
+    ('Proposal Sent', C.TRIGGER_OPP_STAGE, '', 'proposal', 'ProposalSent', False),
     ('Application', C.TRIGGER_OPP_STAGE, '', 'proposal', 'Application', False),
     ('Contract', C.TRIGGER_CONTRACT_SIGNED, '', '', 'Contract', True),
     ('Purchase / Won', C.TRIGGER_DEAL_WON, '', '', 'Purchase', True),

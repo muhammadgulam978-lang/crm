@@ -23,4 +23,12 @@ urlpatterns = [
     
     path('webhook/meta/', views.meta_webhook, name='meta_webhook'),
     path('connections/meta/subscribe/', views.meta_subscribe_page, name='meta_subscribe_page'),
+    path('connections/meta/page-test/', views.meta_page_test, name='meta_page_test'),
+    path('lead-ads/', views.meta_event_list, name='meta_event_list'),
+    path('lead-ads/retry/', views.meta_retry_all, name='meta_retry_all'),
+    path('lead-ads/<int:pk>/retry/', views.meta_event_retry, name='meta_event_retry'),
+    
+    
+    path('webhook/linkedin/', views.linkedin_webhook, name='linkedin_webhook'),
+    path('connections/linkedin/leadsync-test/', views.linkedin_leadsync_test, name='linkedin_leadsync_test'),
 ]

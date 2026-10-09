@@ -35,6 +35,18 @@ class PlatformConnection(models.Model):
         max_length=64, blank=True,
         help_text='Random string you set in Meta App > Webhooks. Used for the initial GET handshake.')
     webhook_subscribed_at = models.DateTimeField(null=True, blank=True)
+    webhook_verified_at = models.DateTimeField(
+        null=True, blank=True, help_text='Last time Meta completed the GET verification handshake.')
+    last_webhook_at = models.DateTimeField(
+        null=True, blank=True, help_text='Last signed leadgen notification received from Meta.')
+    
+        # ---- LinkedIn: Lead Gen Forms (Lead Sync) ----
+    linkedin_organization_urn = models.CharField(
+        'LinkedIn Organization URN', max_length=128, blank=True,
+        help_text='urn:li:organization:<id> — owner of the Lead Gen Forms.')
+    linkedin_webhook_verify_token = models.CharField(
+        max_length=64, blank=True,
+        help_text='Random string echoed back to LinkedIn during the webhook challenge.')
 
     # ---- LinkedIn ----
     ad_account_id = models.CharField('Ad account ID', max_length=64, blank=True)
@@ -77,7 +89,10 @@ class PlatformConnection(models.Model):
         self.page_token_hint = raw[-4:] if raw else ''
 
     def get_page_token(self):
-        return decrypt(self.page_access_token_enc)
+        token = decrypt(self.page_access_token_enc)
+        if token:
+            return token
+        return getattr(settings, 'CAPI_META_PAGE_ACCESS_TOKEN', '') or ''
 
     @property
     def effective_api_version(self):
@@ -122,6 +137,9 @@ class LeadTracking(models.Model):
     campaign_name = models.CharField(max_length=255, blank=True)
     adset_id = models.CharField(max_length=100, blank=True)
     ad_id = models.CharField(max_length=100, blank=True)
+    adset_name = models.CharField(max_length=255, blank=True)
+    ad_name = models.CharField(max_length=255, blank=True)
+    page_id = models.CharField(max_length=64, blank=True)
     form_id = models.CharField(max_length=100, blank=True)
     external_lead_id = models.CharField(
         max_length=100, blank=True,
@@ -174,8 +192,14 @@ class LeadTouchpoint(models.Model):
     campaign_name = models.CharField(max_length=255, blank=True)
     adset_id = models.CharField(max_length=100, blank=True)
     ad_id = models.CharField(max_length=100, blank=True)
+    adset_name = models.CharField(max_length=255, blank=True)
+    ad_name = models.CharField(max_length=255, blank=True)
+    page_id = models.CharField(max_length=64, blank=True)
     form_id = models.CharField(max_length=100, blank=True)
     external_lead_id = models.CharField(max_length=100, blank=True, db_index=True)
+    form_answers = models.JSONField(
+        default=dict, blank=True,
+        help_text='Every question/answer from the lead form, exactly as submitted.')
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -332,8 +356,15 @@ class MetaWebhookEvent(models.Model):
     campaign_id = models.CharField(max_length=64, blank=True)
 
     raw_payload = models.JSONField(default=dict, blank=True)
+    lead_data = models.JSONField(
+        default=dict, blank=True,
+        help_text='Lead object fetched from the Graph API (field_data etc.).')
     processed = models.BooleanField(default=False, db_index=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    gave_up = models.BooleanField(
+        default=False, help_text='Retries exhausted - an admin must retry it manually.')
     lead = models.ForeignKey(
         'leads.Lead', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='meta_webhook_events',
@@ -345,6 +376,42 @@ class MetaWebhookEvent(models.Model):
     class Meta:
         ordering = ['-created_at']
         verbose_name = 'Meta Lead Ads event'
+        indexes = [models.Index(fields=['processed', 'gave_up', 'next_attempt_at'],
+                                name='capi_mwe_retry_idx')]
 
     def __str__(self):
         return f'leadgen {self.leadgen_id}'
+    
+    
+class LinkedInWebhookEvent(models.Model):
+    """
+    One row per lead notification received from LinkedIn Lead Sync.
+    Idempotency anchor: unique on `lead_urn` (LinkedIn response URN).
+    """
+    lead_urn = models.CharField('LinkedIn Lead URN', max_length=128, unique=True, db_index=True)
+    linkedin_lead_id = models.CharField('LinkedIn Lead ID', max_length=64, blank=True, db_index=True)
+    form_urn = models.CharField('Form URN', max_length=128, blank=True)
+    form_id = models.CharField('Form ID', max_length=64, blank=True)
+    owner_urn = models.CharField('Owner URN', max_length=128, blank=True)
+    campaign_urn = models.CharField(max_length=128, blank=True)
+    creative_urn = models.CharField(max_length=128, blank=True)
+    share_urn = models.CharField(max_length=128, blank=True)
+
+    raw_payload = models.JSONField(default=dict, blank=True)
+    processed = models.BooleanField(default=False, db_index=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    lead = models.ForeignKey('leads.Lead', null=True, blank=True,
+                             on_delete=models.SET_NULL,
+                             related_name='linkedin_webhook_events')
+    error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'LinkedIn Lead Gen event'
+
+    def __str__(self):
+        return f'LinkedIn lead {self.lead_urn}'    
+    
+    
+    

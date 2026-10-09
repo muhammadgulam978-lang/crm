@@ -84,7 +84,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'leadcrm.wsgi.application'
 
 
-
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'mail.synergyintegratedsolutions.pk'
 EMAIL_PORT = 465
@@ -210,21 +209,20 @@ META_WA_ACCESS_TOKEN = os.environ.get('META_WA_ACCESS_TOKEN', '')
 META_WA_API_VERSION = 'v20.0'  
 META_WA_VERIFY_TOKEN = os.environ.get('META_WA_VERIFY_TOKEN', 'change-this-verify-token')
 
+###### Linkedin ########
 
 LINKEDIN_CLIENT_ID = os.getenv('LINKEDIN_CLIENT_ID', '')
 LINKEDIN_CLIENT_SECRET = os.getenv('LINKEDIN_CLIENT_SECRET', '')
 LINKEDIN_REDIRECT_URI = os.getenv('LINKEDIN_REDIRECT_URI', 'https://www.linkedin.com/developers/tools/oauth/redirect')
 
-
 GOOGLE_REDIRECT_URI = 'http://127.0.0.1:8000/google/callback/'
-
 SITE_BASE_URL = 'http://127.0.0.1:8000'  
 
 # ---------- Twilio (phone calling) ----------
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
-TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')  # e.g. +1XXXXXXXXXX
-AGENT_FALLBACK_NUMBER = os.environ.get('AGENT_FALLBACK_NUMBER', '')  # default agent number if none passed
+TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')  
+AGENT_FALLBACK_NUMBER = os.environ.get('AGENT_FALLBACK_NUMBER', '')  
 
 
 # ---------- Google Calendar ----------

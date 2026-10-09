@@ -5,7 +5,6 @@ from .models import ConversionEventConfig, LeadTracking, PlatformConnection
 
 
 class ConnectionForm(forms.ModelForm):
-    # CAPI access token (write-only, encrypted)
     access_token = forms.CharField(
         required=False,
         widget=forms.PasswordInput(render_value=False,
@@ -13,7 +12,6 @@ class ConnectionForm(forms.ModelForm):
         help_text='Stored encrypted. Leave blank to keep the current token.')
     clear_token = forms.BooleanField(required=False, label='Remove stored token')
 
-    # Meta Lead Ads page token (write-only, encrypted)
     page_access_token = forms.CharField(
         required=False,
         widget=forms.PasswordInput(render_value=False,
@@ -26,7 +24,9 @@ class ConnectionForm(forms.ModelForm):
             'is_active', 'name', 'api_version',
             'dataset_id', 'test_event_code', 'lead_event_source',
             'page_id', 'webhook_verify_token', 'webhook_subscribed_at',
-            'ad_account_id', 'token_expires_at',
+            'ad_account_id',
+            'linkedin_organization_urn', 'linkedin_webhook_verify_token',
+            'token_expires_at',
         ]
         widgets = {
             'token_expires_at': forms.DateTimeInput(
@@ -40,16 +40,15 @@ class ConnectionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         platform = platform or self.instance.platform
 
-        # 1) Set field-level options BEFORE we pop anything
         if 'token_expires_at' in self.fields:
             self.fields['token_expires_at'].input_formats = ['%Y-%m-%dT%H:%M']
         if 'webhook_subscribed_at' in self.fields:
             self.fields['webhook_subscribed_at'].required = False
             self.fields['webhook_subscribed_at'].disabled = True
 
-        # 2) Drop platform-specific fields
         if platform == C.PLATFORM_META:
-            drop = ['ad_account_id']
+            drop = ['ad_account_id',
+                    'linkedin_organization_urn', 'linkedin_webhook_verify_token']
         else:
             drop = ['dataset_id', 'test_event_code', 'lead_event_source',
                     'page_id', 'webhook_verify_token', 'webhook_subscribed_at',
@@ -57,7 +56,6 @@ class ConnectionForm(forms.ModelForm):
         for f in drop:
             self.fields.pop(f, None)
 
-        # 3) Apply Bootstrap class
         for f in self.fields.values():
             if not isinstance(f.widget, forms.CheckboxInput):
                 f.widget.attrs.setdefault('class', 'form-control')
@@ -68,11 +66,9 @@ class ConnectionForm(forms.ModelForm):
             obj.set_token('')
         elif self.cleaned_data.get('access_token'):
             obj.set_token(self.cleaned_data['access_token'])
-
         page_token = self.cleaned_data.get('page_access_token')
         if page_token:
             obj.set_page_token(page_token)
-
         if commit:
             obj.save()
         return obj
