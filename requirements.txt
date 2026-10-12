@@ -11,3 +11,4 @@ python-decouple
 python-dotenv
 dj-database-url
 psycopg[binary]
+whitenoise
