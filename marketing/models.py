@@ -363,7 +363,7 @@ class Referral(models.Model):
                 name='mkt_unique_referral_pair',
             ),
             models.CheckConstraint(
-                condition=models.Q(referrer_lead=models.F('referred_lead')) | models.Q(referrer_lead__isnull=True),
+                condition=~models.Q(referrer_lead=models.F('referred_lead')) | models.Q(referrer_lead__isnull=True),
                 name='mkt_referral_no_self_referral',
             ),
         ]
