@@ -79,7 +79,7 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "CSRF_TRUSTED_ORIGINS",
-        "https://*.vercel.app"
+        "https://synergyintegratedsolutions-crm.vercel.app,https://*.vercel.app"
     ).split(",")
     if origin.strip()
 ]
