@@ -94,12 +94,12 @@ class Campaign(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(end_date__isnull=True) | models.Q(start_date__isnull=True)
+                condition=models.Q(end_date__isnull=True) | models.Q(start_date__isnull=True)
                       | models.Q(end_date__gte=models.F('start_date')),
                 name='mkt_campaign_end_after_start',
             ),
             models.CheckConstraint(
-                check=models.Q(budget_amount__isnull=True) | models.Q(budget_amount__gte=0),
+                condition=models.Q(budget_amount__isnull=True) | models.Q(budget_amount__gte=0),
                 name='mkt_campaign_budget_nonneg',
             ),
         ]
@@ -363,7 +363,7 @@ class Referral(models.Model):
                 name='mkt_unique_referral_pair',
             ),
             models.CheckConstraint(
-                check=~models.Q(referrer_lead=models.F('referred_lead')) | models.Q(referrer_lead__isnull=True),
+                condition=models.Q(referrer_lead=models.F('referred_lead')) | models.Q(referrer_lead__isnull=True),
                 name='mkt_referral_no_self_referral',
             ),
         ]
