@@ -126,12 +126,14 @@ def _process_one(notif, result):
     campaign_id = campaign_urn.rsplit(':', 1)[-1] if ':' in campaign_urn else ''
 
     lead, _created = upsert_lead_from_platform(
+
         platform=C.PLATFORM_LINKEDIN,
         name=name,
         email=fields.get('email', ''),
         phone=fields.get('contact_number', ''),
         company=fields.get('company', ''),
-        consent=C.CONSENT_GRANTED,          
+        job_title=fields.get('job_title', ''),      # ← NAYA
+        consent=C.CONSENT_GRANTED,
         external_lead_id=linkedin_lead_id,
         campaign_id=campaign_id,
         campaign_name='',

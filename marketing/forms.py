@@ -189,4 +189,178 @@ class ProspectImportForm(BootstrapMixin, forms.Form):
         name = f.name.lower()
         if not (name.endswith('.csv') or name.endswith('.xlsx') or name.endswith('.xls')):
             raise forms.ValidationError('Only .csv, .xlsx or .xls files are allowed.')
-        return f        
+        return f     
+    
+    
+    
+    
+# =========================================================================
+# Public website lead form (no auth)
+# =========================================================================
+class PublicLeadForm(BootstrapMixin, forms.Form):
+    """Public-facing lead form. Rendered on the website, not in the CRM UI."""
+    name = forms.CharField(max_length=150, label='Your name')
+    email = forms.EmailField(required=False, label='Email')
+    phone = forms.CharField(max_length=30, required=False, label='Phone')
+    company = forms.CharField(max_length=200, required=False, label='Company')
+    industry = forms.CharField(max_length=100, required=False, label='Industry')
+    budget = forms.CharField(max_length=50, required=False, label='Budget range')
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 4}),
+        required=False, label='What do you need help with?',
+    )
+
+    # Honeypot — hidden in template, filled only by bots
+    website_url = forms.CharField(required=False, widget=forms.HiddenInput())
+
+    def clean(self):
+        cleaned = super().clean()
+        name = (cleaned.get('name') or '').strip()
+        email = (cleaned.get('email') or '').strip().lower()
+        phone = (cleaned.get('phone') or '').strip()
+
+        if not name:
+            self.add_error('name', 'Please enter your name.')
+        if not email and not phone:
+            self.add_error('email', 'Please provide either an email or a phone number.')
+
+        if email:
+            import re
+            if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+                self.add_error('email', 'Please enter a valid email address.')
+
+        return cleaned# =========================================================================
+# Public website lead form (no auth)
+# =========================================================================
+class PublicLeadForm(BootstrapMixin, forms.Form):
+    """Public-facing lead form. Rendered on the website, not in the CRM UI."""
+    name = forms.CharField(max_length=150, label='Your name')
+    email = forms.EmailField(required=False, label='Email')
+    phone = forms.CharField(max_length=30, required=False, label='Phone')
+    company = forms.CharField(max_length=200, required=False, label='Company')
+    industry = forms.CharField(max_length=100, required=False, label='Industry')
+    budget = forms.CharField(max_length=50, required=False, label='Budget range')
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 4}),
+        required=False, label='What do you need help with?',
+    )
+
+    # Honeypot — hidden in template, filled only by bots
+    website_url = forms.CharField(required=False, widget=forms.HiddenInput())
+
+    def clean(self):
+        cleaned = super().clean()
+        name = (cleaned.get('name') or '').strip()
+        email = (cleaned.get('email') or '').strip().lower()
+        phone = (cleaned.get('phone') or '').strip()
+
+        if not name:
+            self.add_error('name', 'Please enter your name.')
+        if not email and not phone:
+            self.add_error('email', 'Please provide either an email or a phone number.')
+
+        if email:
+            import re
+            if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+                self.add_error('email', 'Please enter a valid email address.')
+
+        return cleaned   
+    
+    
+    
+# =========================================================================
+# Public website lead form — no auth required
+# =========================================================================
+import json as _json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+from .forms import PublicLeadForm
+from .services import lead_form as lf
+
+
+def public_lead_form(request):
+    """
+    GET:  render the standalone HTML form.
+    POST: validate + create lead, return thank-you page or JSON.
+    CSRF-exempt: this endpoint is meant to be embedded cross-origin.
+    """
+    utm = lf.extract_utm(request)
+    want_json = (
+        request.method == 'POST'
+        and ('application/json' in request.META.get('HTTP_ACCEPT', '')
+             or request.POST.get('format') == 'json')
+    )
+
+    if request.method == 'GET':
+        form = PublicLeadForm()
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': form, 'utm': utm, 'success': False,
+        })
+
+    # --- POST ---
+    # 1) Honeypot check (silent discard)
+    if lf.is_honeypot_filled(request.POST):
+        if want_json:
+            return JsonResponse({'ok': True, 'message': 'Thank you.'})
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': PublicLeadForm(), 'utm': utm, 'success': True,
+        })
+
+    # 2) Rate limit
+    ip = lf._client_ip(request)
+    if lf.rate_limited(ip):
+        msg = 'Too many submissions from this network. Please try again later.'
+        if want_json:
+            return JsonResponse({'ok': False, 'error': msg}, status=429)
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': PublicLeadForm(), 'utm': utm, 'error': msg,
+        }, status=429)
+
+    # 3) Validate
+    form = PublicLeadForm(request.POST)
+    if not form.is_valid():
+        if want_json:
+            return JsonResponse({'ok': False, 'errors': form.errors}, status=400)
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': form, 'utm': utm, 'success': False,
+        }, status=400)
+
+    # 4) Persist
+    try:
+        result = lf.create_lead_from_form(
+            request=request,
+            cleaned=form.cleaned_data,
+            utm=utm,
+        )
+    except Exception as exc:
+        logger.exception('Public lead form save failed')
+        msg = 'Something went wrong on our side. Please try again.'
+        if want_json:
+            return JsonResponse({'ok': False, 'error': msg}, status=500)
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': form, 'utm': utm, 'error': msg,
+        }, status=500)
+
+    if want_json:
+        return JsonResponse({
+            'ok': True,
+            'lead_id': result['lead'].pk,
+            'created': result['created'],
+            'matched_existing': result['matched_existing'],
+            'message': 'Thank you — we will get back to you shortly.',
+        }, status=201 if result['created'] else 200)
+
+    return render(request, 'marketing/public_lead_form.html', {
+        'form': PublicLeadForm(),
+        'utm': utm,
+        'success': True,
+    })
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def public_lead_form_api(request):
+    """JSON-only variant for SPAs / JS widgets. Same logic, always JSON."""
+    return public_lead_form(request)

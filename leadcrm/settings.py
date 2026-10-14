@@ -5,7 +5,6 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -32,7 +31,6 @@ MIDDLEWARE = [
     'leads.middleware.RoleAccessMiddleware',
 ]
 
-
 ROOT_URLCONF = 'leadcrm.urls'
 
 TEMPLATES = [
@@ -53,13 +51,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'leadcrm.wsgi.application'
 
-
 # Local development only; Vercel variables dashboard se load honge.
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
-
-
 
 if not SECRET_KEY:
     raise RuntimeError("DJANGO_SECRET_KEY environment variable is missing")
@@ -167,7 +162,6 @@ EMAIL_ACCOUNTS = {
     },
 }
 
-
 # Meta WhatsApp Cloud API
 META_WHATSAPP_TOKEN = os.getenv("META_WHATSAPP_TOKEN", "")
 META_PHONE_NUMBER_ID = os.getenv("META_PHONE_NUMBER_ID", "")
@@ -180,9 +174,9 @@ META_WA_API_VERSION = os.getenv("META_WA_API_VERSION", "v20.0")
 META_WA_VERIFY_TOKEN = os.getenv("META_WA_VERIFY_TOKEN", "")
 
 # LinkedIn
-LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID", "")
-LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", "")
-LINKEDIN_REDIRECT_URI = os.getenv("LINKEDIN_REDIRECT_URI", "")
+CAPI_LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID", "")
+CAPI_LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", "")
+CAPI_LINKEDIN_REDIRECT_URI = os.getenv("LINKEDIN_REDIRECT_URI", "")
 
 # Site URL
 SITE_BASE_URL = os.getenv(
@@ -208,7 +202,13 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "")
 AGENT_FALLBACK_NUMBER = os.getenv("AGENT_FALLBACK_NUMBER", "")
 
-# Groq AI
+
+# OpenAI (replaces Groq for Marketing Center AI content)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # Meta + LinkedIn Conversion API
@@ -249,7 +249,6 @@ SECURE_SSL_REDIRECT = (
 )
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
 
 
 # Static files

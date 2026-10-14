@@ -1,0 +1,48 @@
+WEEKLY MARKETING REPORT — {{ r.period.label }}
+================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+New leads:        {{ r.summary.total_leads }}
+HOT leads:        {{ r.summary.hot_leads }}
+WARM leads:       {{ r.summary.warm_leads }}
+COLD leads:       {{ r.summary.cold_leads }}
+Unknown score:    {{ r.summary.unknown_leads }}
+Converted:        {{ r.summary.converted_7d }}
+Lost:             {{ r.summary.lost_7d }}
+Conversion rate:  {{ r.summary.conversion_rate }}%
+Revenue:          {{ r.summary.revenue_7d }}
+
+LEADS BY SOURCE
+---------------
+{% for row in r.by_source %}- {{ row.marketing_source__name }} ({{ row.marketing_source__kind }}): {{ row.n }}
+{% empty %}- (no marketing-sourced leads this week)
+{% endfor %}
+
+CAMPAIGN PERFORMANCE
+--------------------
+{% for c in r.campaign_stats %}- {{ c.name }} [{{ c.channel }}] — {{ c.leads }}/{{ c.target_leads }} leads ({{ c.status }})
+{% empty %}- (no active campaigns)
+{% endfor %}
+
+TOP SALESPERSONS
+----------------
+{% for s in r.sp_stats %}- {{ s.spo__name }}: total {{ s.total }}, positive {{ s.positive }}, converted {{ s.converted }}
+{% empty %}- (no assignments)
+{% endfor %}
+
+COMPLIANCE & OUTREACH
+---------------------
+Consent granted:  {{ r.consent.granted }}
+Consent denied:   {{ r.consent.denied }}
+Suppressed:       {{ r.consent.suppressed }}
+New referrals:    {{ r.referrals.total }} ({{ r.referrals.pending }} pending)
+Content published:{{ r.content.published }}
+
+REACTIVATION
+------------
+{{ r.reactivation.dormant_count }} lead(s) dormant for 60+ days.
+Open /marketing/reactivation/ to act on them.
+
+================================================================
+All-time totals — {{ r.totals_all_time.leads }} leads ({{ r.totals_all_time.leads_30d }} in last 30 days).

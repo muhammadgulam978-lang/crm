@@ -60,11 +60,14 @@ def last_communication(lead):
     from leads.models import CommunicationLog, EmailLog, CallLog
     candidates = []
     c = CommunicationLog.objects.filter(lead=lead).order_by('-created_at').first()
-    if c: candidates.append(('communication', c.created_at, c))
+    if c:
+        candidates.append(('communication', c.created_at, c))
     e = EmailLog.objects.filter(lead=lead).order_by('-created_at').first()
-    if e: candidates.append(('email', e.created_at, e))
+    if e:
+        candidates.append(('email', e.created_at, e))
     call = CallLog.objects.filter(lead=lead).order_by('-created_at').first()
-    if call: candidates.append(('call', call.created_at, call))
+    if call:
+        candidates.append(('call', call.created_at, call))
     if not candidates:
         return None
     candidates.sort(key=lambda t: t[1], reverse=True)

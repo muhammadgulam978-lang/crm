@@ -6,7 +6,6 @@ from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-
 import csv
 from django.http import HttpResponse
 from django.core.paginator import Paginator
@@ -625,9 +624,6 @@ def prospect_import_template(request):
     return response    
 
 
-
-
-
 # =========================================================================
 # Phase 2.5 — Reactivation Center
 # =========================================================================
@@ -722,4 +718,140 @@ def content_calendar(request):
         'month_name': first_day.strftime('%B'),
         'today': today,
         'status_choices': MarketingContent.STATUS_CHOICES,
+    })
+    
+    
+    
+# =========================================================================
+# Public website lead form — no auth required
+# =========================================================================
+import json as _json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+from .forms import PublicLeadForm
+from .services import lead_form as lf
+
+
+def public_lead_form(request):
+    """
+    GET:  render the standalone HTML form.
+    POST: validate + create lead, return thank-you page or JSON.
+    CSRF-exempt: this endpoint is meant to be embedded cross-origin.
+    """
+    utm = lf.extract_utm(request)
+    want_json = (
+        request.method == 'POST'
+        and ('application/json' in request.META.get('HTTP_ACCEPT', '')
+             or request.POST.get('format') == 'json')
+    )
+
+    if request.method == 'GET':
+        form = PublicLeadForm()
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': form, 'utm': utm, 'success': False,
+        })
+
+    # --- POST ---
+    # 1) Honeypot check (silent discard)
+    if lf.is_honeypot_filled(request.POST):
+        if want_json:
+            return JsonResponse({'ok': True, 'message': 'Thank you.'})
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': PublicLeadForm(), 'utm': utm, 'success': True,
+        })
+
+    # 2) Rate limit
+    ip = lf._client_ip(request)
+    if lf.rate_limited(ip):
+        msg = 'Too many submissions from this network. Please try again later.'
+        if want_json:
+            return JsonResponse({'ok': False, 'error': msg}, status=429)
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': PublicLeadForm(), 'utm': utm, 'error': msg,
+        }, status=429)
+
+    # 3) Validate
+    form = PublicLeadForm(request.POST)
+    if not form.is_valid():
+        if want_json:
+            return JsonResponse({'ok': False, 'errors': form.errors}, status=400)
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': form, 'utm': utm, 'success': False,
+        }, status=400)
+
+    # 4) Persist
+    try:
+        result = lf.create_lead_from_form(
+            request=request,
+            cleaned=form.cleaned_data,
+            utm=utm,
+        )
+    except Exception as exc:
+        logger.exception('Public lead form save failed')
+        msg = 'Something went wrong on our side. Please try again.'
+        if want_json:
+            return JsonResponse({'ok': False, 'error': msg}, status=500)
+        return render(request, 'marketing/public_lead_form.html', {
+            'form': form, 'utm': utm, 'error': msg,
+        }, status=500)
+
+    if want_json:
+        return JsonResponse({
+            'ok': True,
+            'lead_id': result['lead'].pk,
+            'created': result['created'],
+            'matched_existing': result['matched_existing'],
+            'message': 'Thank you — we will get back to you shortly.',
+        }, status=201 if result['created'] else 200)
+
+    return render(request, 'marketing/public_lead_form.html', {
+        'form': PublicLeadForm(),
+        'utm': utm,
+        'success': True,
+    })
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def public_lead_form_api(request):
+    """JSON-only variant for SPAs / JS widgets. Same logic, always JSON."""
+    return public_lead_form(request)
+
+
+
+
+# =========================================================================
+# Weekly report — web preview + send-now
+# =========================================================================
+from django.core.management import call_command
+from marketing.services import weekly_report as wr
+
+
+@marketing_access
+def weekly_report_preview(request):
+    """Preview the report in the browser + send-now button."""
+    days = int(request.GET.get('days', 7))
+    if days not in (7, 14, 30):
+        days = 7
+
+    if request.method == 'POST':
+        try:
+            sent, error = wr.send(days=days)
+            if error:
+                messages.error(request, f'Send failed: {error}')
+            else:
+                messages.success(request, f'Weekly report sent to {sent} recipient(s).')
+        except Exception as exc:
+            messages.error(request, f'Unexpected error: {exc}')
+        return redirect(f'{request.path}?days={days}')
+
+    data = wr.collect(days=days)
+    recipients = wr.default_recipients()
+    return render(request, 'marketing/weekly_report_preview.html', {
+        'active': 'marketing',
+        'data': data,
+        'days': days,
+        'recipients': recipients,
     })

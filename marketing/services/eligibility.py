@@ -3,31 +3,9 @@ from django.utils import timezone
 
 from marketing import constants as C
 from marketing.models import MarketingConsent, SuppressionEntry
-
-
-def normalize_value(channel, value):
-    import re
-    if channel == C.CHANNEL_EMAIL:
-        return (value or '').strip().lower()
-    return re.sub(r'\D', '', value or '')
-
-
-def is_suppressed(channel, value):
-    v = normalize_value(channel, value)
-    if not v:
-        return False
-    now = timezone.now()
-    qs = SuppressionEntry.objects.filter(channel=channel, value=v)
-    return qs.filter(expires_at__isnull=True).exists() or qs.filter(expires_at__gt=now).exists()
-
-
-def has_consent(lead, channel, purpose=C.PURPOSE_MARKETING):
-    if not lead:
-        return False
-    return MarketingConsent.objects.filter(
-        lead=lead, channel=channel, purpose=purpose,
-        status=C.CONSENT_GRANTED,
-    ).exists()
+from marketing.services.consent import (
+    normalize_value, is_suppressed, has_consent,
+)
 
 
 def can_contact(lead, channel, purpose=C.PURPOSE_MARKETING):

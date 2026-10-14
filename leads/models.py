@@ -1255,3 +1255,21 @@ class GoogleCredential(models.Model):
         help_text='Which SIS service the prospect is interested in.'
     )
     
+    
+
+
+LEAD_SOURCE_CHOICES = [
+    ('advertisement', 'Advertisement'),
+    ('landline', 'Landline'),
+    ('direct_call', 'Direct Call'),
+    ('facebook', 'Facebook'),
+    ('linkedin', 'LinkedIn'),              # ← NAYA
+    ('whatsapp', 'Whatsapp'),
+    ('website', 'Website'),
+    ('personal_reference', 'Personal Reference'),
+    ('client_reference', 'Client Reference'),
+    ('staff_reference', 'Staff Reference'),
+    ('email', 'Email'),
+    ('walkin', 'Walkin'),
+]
+    

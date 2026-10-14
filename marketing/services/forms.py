@@ -23,4 +23,5 @@ class AIAssistantForm(BootstrapMixin, forms.Form):
     problem = forms.CharField(max_length=400, required=False, widget=forms.Textarea(attrs={'rows': 2}))
     channel = forms.ChoiceField(
         choices=[('', '—'), ('linkedin', 'LinkedIn'), ('facebook', 'Facebook'),
-                 ('instagram', 'Instagram'),
+                 ('instagram', 'Instagram'),])
+        

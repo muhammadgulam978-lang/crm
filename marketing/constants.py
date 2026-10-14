@@ -69,6 +69,23 @@ CONTENT_KIND_CHOICES = [
     (CONTENT_KIND_LANDING, 'Landing page'),
 ]
 
+
+# ---- HOT / WARM / COLD lead temperature ---- #
+LEAD_TEMPERATURE_HOT = 'hot'
+LEAD_TEMPERATURE_WARM = 'warm'
+LEAD_TEMPERATURE_COLD = 'cold'
+LEAD_TEMPERATURE_UNKNOWN = 'unknown'
+LEAD_TEMPERATURE_CHOICES = [
+    (LEAD_TEMPERATURE_HOT, 'HOT'),
+    (LEAD_TEMPERATURE_WARM, 'WARM'),
+    (LEAD_TEMPERATURE_COLD, 'COLD'),
+    (LEAD_TEMPERATURE_UNKNOWN, 'Unknown'),
+]
+
+# Score thresholds (0-100) — used by marketing.services.qualify
+HOT_THRESHOLD = 70
+WARM_THRESHOLD = 40
+
 # ---- Consent (channel x purpose) ----
 CHANNEL_EMAIL = 'email'
 CHANNEL_SMS = 'sms'

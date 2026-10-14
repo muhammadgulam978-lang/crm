@@ -1,33 +1,29 @@
 """Lead direction (Meta / LinkedIn Lead Sync -> CRM). Deduplicates instead of creating
-a second lead when the same person interacts with several campaigns, and replays of the
-same Meta lead ID are no-ops."""
+a second lead when the same person interacts with several campaigns.
+
+Also writes a meaningful CRM timeline entry (CommunicationLog) and an audit entry
+(ActivityLog) for every imported lead."""
+import json
 import logging
-
-from django.db import connection, transaction
-
-from leads.models import Lead
-
+from django.db import transaction
+from leads.models import ActivityLog, CommunicationLog, Lead
 from .. import constants as C
 from ..models import LeadTouchpoint, LeadTracking
-from . import crm_hooks
 from . import identifiers as ids
 
 logger = logging.getLogger(__name__)
-SOURCE_BY_PLATFORM = {'meta': 'facebook', 'linkedin': 'advertisement'}
-PLATFORM_LABEL = {'meta': 'Facebook/Meta Lead Ad', 'linkedin': 'LinkedIn Lead Gen'}
-TOUCH_FIELDS = ('campaign_id', 'campaign_name', 'adset_id', 'adset_name', 'ad_id', 'ad_name',
-                'page_id', 'form_id', 'external_lead_id')
+
+# Map our platform constant -> Lead.lead_source choice
+# SOURCE_BY_PLATFORM = {
+#     'meta': 'facebook',
+#     'linkedin': 'linkedin',
+# }
+PLATFORM_DISPLAY = {
+    'meta': 'Meta',
+    'linkedin': 'LinkedIn',
+}
+TOUCH_FIELDS = ('campaign_id', 'campaign_name', 'adset_id', 'ad_id', 'form_id', 'external_lead_id')
 CLICK_FIELDS = ('fbc', 'fbp', 'li_fat_id', 'client_ip', 'user_agent')
-STANDARD_ANSWER_KEYS = {'full_name', 'name', 'first_name', 'last_name', 'email', 'email_address',
-                        'phone_number', 'phone', 'mobile', 'company_name', 'company'}
-
-
-def _intake_lock():
-    """Serialise intake on PostgreSQL so two simultaneous submissions from the same person
-    cannot both pass the 'does this lead exist?' check. Released at transaction end."""
-    if connection.vendor == 'postgresql':
-        with connection.cursor() as cur:
-            cur.execute('SELECT pg_advisory_xact_lock(%s)', [7_204_118_001])
 
 
 def find_existing_lead(platform, email='', phone='', external_lead_id=''):
@@ -50,52 +46,40 @@ def find_existing_lead(platform, email='', phone='', external_lead_id=''):
     return None
 
 
-def _pretty(key):
-    return key.replace('_', ' ').strip().capitalize()
-
-
-def format_answers(answers, skip_standard=False):
-    lines = []
-    for key, value in (answers or {}).items():
-        if skip_standard and key in STANDARD_ANSWER_KEYS:
-            continue
-        if value not in ('', None):
-            lines.append(f'{_pretty(key)}: {value}')
+def _timeline_body(platform, touch, extra_fields):
+    """Compose a human-readable body for the lead's timeline."""
+    # lines = [f'Lead received from {platform.title()} Lead Ads.']
+    
+    display = PLATFORM_DISPLAY.get(platform, platform.title())
+    lines = [f'Lead received from {display} Lead Ads.']
+    if touch.get('campaign_name') or touch.get('campaign_id'):
+        camp = touch.get('campaign_name') or ''
+        cid = touch.get('campaign_id') or ''
+        lines.append(f'Campaign: {camp} {("(" + cid + ")") if cid else ""}'.strip())
+    if touch.get('adset_id'):
+        lines.append(f'Ad set: {touch["adset_id"]}')
+    if touch.get('ad_id'):
+        lines.append(f'Ad: {touch["ad_id"]}')
+    if touch.get('form_id'):
+        lines.append(f'Form: {touch["form_id"]}')
+    if touch.get('external_lead_id'):
+        lines.append(f'Platform lead ID: {touch["external_lead_id"]}')
+    for key, value in (extra_fields or {}).items():
+        if value:
+            lines.append(f'{key}: {value}')
     return '\n'.join(lines)
-
-
-def _activity_text(platform, created, touch, answers, company):
-    label = PLATFORM_LABEL.get(platform, platform)
-    title = (f'Lead created from {label}' if created
-             else f'Existing lead re-engaged via {label}')
-    parts = [f'{k}: {touch[k]}' for k in ('campaign_name', 'campaign_id', 'adset_name', 'adset_id',
-                                         'ad_name', 'ad_id', 'form_id', 'page_id', 'external_lead_id')
-             if touch.get(k)]
-    if company:
-        parts.append(f'company: {company}')
-    body = '\n'.join(parts)
-    answered = format_answers(answers)
-    if answered:
-        body += '\n\nForm answers:\n' + answered
-    return title, body
 
 
 @transaction.atomic
 def upsert_lead_from_platform(platform, *, name='', email='', phone='', company='',
-                              consent=None, run_ai=True, **extra):
-    """Returns (lead, created). `extra` may hold TOUCH_FIELDS, CLICK_FIELDS and form_answers.
-    Replaying the same external_lead_id returns the original lead without touching anything."""
+                              job_title='', consent=None, run_ai=True, **extra):
+    """Returns (lead, created). `extra` may hold TOUCH_FIELDS, CLICK_FIELDS,
+    page_id, adset_name, ad_name, form_answers and any other raw form answers."""
     touch = {k: (extra.get(k) or '') for k in TOUCH_FIELDS}
     clicks = {k: extra.get(k) for k in CLICK_FIELDS if extra.get(k)}
-    answers = extra.get('form_answers') or {}
-
-    _intake_lock()
-
-    if touch['external_lead_id']:
-        seen = LeadTouchpoint.objects.filter(
-            platform=platform, external_lead_id=touch['external_lead_id']).select_related('lead').first()
-        if seen:
-            return seen.lead, False
+    form_answers = extra.get('form_answers') or {}
+    adset_name = extra.get('adset_name') or ''
+    ad_name = extra.get('ad_name') or ''
 
     lead = find_existing_lead(platform, email, phone, touch['external_lead_id'])
     created = lead is None
@@ -103,13 +87,15 @@ def upsert_lead_from_platform(platform, *, name='', email='', phone='', company=
         detail_parts = []
         if company:
             detail_parts.append(f'Company: {company}')
-        extra_answers = format_answers(answers, skip_standard=True)
-        if extra_answers:
-            detail_parts.append(f'{PLATFORM_LABEL.get(platform, platform)} form answers:\n{extra_answers}')
+        if job_title:
+            detail_parts.append(f'Job title: {job_title}')
         lead = Lead.objects.create(
-            name=name or 'Unknown', contact_number=phone or '', email=ids.normalize_email(email) or '',
+            name=name or 'Unknown',
+            contact_number=phone or '',
+            email=ids.normalize_email(email),
             lead_source=SOURCE_BY_PLATFORM.get(platform, 'advertisement'),
-            detail='\n\n'.join(detail_parts) or None)
+            detail='\n'.join(detail_parts) or None,
+        )
     else:
         changed = []
         if email and not lead.email and ids.normalize_email(email):
@@ -119,44 +105,80 @@ def upsert_lead_from_platform(platform, *, name='', email='', phone='', company=
         if changed:
             lead.save(update_fields=changed)
 
-    LeadTouchpoint.objects.create(lead=lead, platform=platform, form_answers=answers, **touch)
+    LeadTouchpoint.objects.create(lead=lead, platform=platform, **touch)
 
     tracking, _ = LeadTracking.objects.get_or_create(lead=lead)
-    tracking.platform = platform                       # latest touch drives attribution
+    tracking.platform = platform
     for k, v in touch.items():
         if v:
             setattr(tracking, k, v)
-    if platform == C.PLATFORM_META and touch['external_lead_id'] and not tracking.meta_leadgen_id:
-        tracking.meta_leadgen_id = touch['external_lead_id']
     for k, v in clicks.items():
         setattr(tracking, k, v)
     if consent in (C.CONSENT_GRANTED, C.CONSENT_DENIED):
         tracking.consent_status = consent
     tracking.save()
 
-    title, body = _activity_text(platform, created, touch, answers, company)
-    crm_hooks.log_activity(lead, title, body)
-
-    if run_ai:
-        lead_id = lead.pk
-        transaction.on_commit(lambda: _post_import(lead_id, created, touch))
-    return lead, created
-
-
-def _post_import(lead_id, created, touch):
-    """Reuse the CRM's own AI pipeline + follow-up hooks AFTER the import has committed.
-    Never lets a failure here affect the imported lead."""
-    lead = Lead.objects.filter(pk=lead_id).first()
-    if lead is None:
-        return
+    # ---- CRM TIMELINE: CommunicationLog (shows on lead detail page) ----
     try:
-        if created:
+        extra_lines = {}
+        if job_title:
+            extra_lines['Job title'] = job_title
+        if company:
+            extra_lines['Company'] = company
+        if adset_name:
+            extra_lines['Ad set name'] = adset_name
+        if ad_name:
+            extra_lines['Ad name'] = ad_name
+
+        body = _timeline_body(platform, touch, extra_lines)
+        if form_answers:
+            body += '\n\nForm answers:'
+            for q, a in form_answers.items():
+                if a and q != '_raw':
+                    body += f'\n  {q}: {a}'
+
+        CommunicationLog.objects.create(
+            comm_type='note',
+            direction='inbound',
+            subject=f'Lead imported from {PLATFORM_DISPLAY.get(platform, platform.title())} Lead Ads',
+            body=body,
+            lead=lead,
+        )
+    except Exception:
+        logger.exception('Failed to write CommunicationLog for lead %s', lead.pk)
+
+    # ---- CRM AUDIT: ActivityLog (structured audit trail) ----
+    try:
+        ActivityLog.objects.create(
+            action='created',
+            entity_type='Lead',
+            entity_id=lead.pk,
+            entity_name=lead.name,
+            # description=(
+            #     f'Lead {"created" if created else "updated"} from {platform.title()} '
+            #     f'Lead Ads (form {touch.get("form_id") or "n/a"}, '
+            #     f'campaign {touch.get("campaign_id") or "n/a"}).'
+            # ),
+            
+            description=(
+                f'Lead {"created" if created else "updated"} from '
+                f'{PLATFORM_DISPLAY.get(platform, platform.title())} '
+                f'Lead Ads (form {touch.get("form_id") or "n/a"}, '
+                f'campaign {touch.get("campaign_id") or "n/a"}).'
+            ),
+        )
+    except Exception:
+        logger.exception('Failed to write ActivityLog for lead %s', lead.pk)
+
+    # ---- Existing AI follow-up ----
+    if created and run_ai:
+        try:
             from leads.duplicate_detector import check_and_mark_duplicate
             if not check_and_mark_duplicate(lead):
                 from leads.ai_assignment import assign_lead_with_ai
                 assign_lead_with_ai(lead)
-        from leads.ai_scorer import update_lead_score
-        update_lead_score(lead)
-    except Exception:
-        logger.exception('AI post-processing failed for lead %s', lead_id)
-    crm_hooks.run_post_import(lead, created, touch)
+            from leads.ai_scorer import update_lead_score
+            update_lead_score(lead)
+        except Exception:
+            logger.exception('AI post-processing failed for lead %s', lead.pk)
+    return lead, created

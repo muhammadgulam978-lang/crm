@@ -26,10 +26,7 @@ urlpatterns = [
 
     # Consent
     path('consent/', views.consent_list, name='consent_list'),
-    # path('consent/new/', views.consent_create, name='consent_create'),
-    # path('consent/<int:pk>/edit/', views.consent_edit, name='consent_edit'),
-    # path('consent/<int:pk>/delete/', views.consent_delete, name='consent_delete'),
-    
+
     path('consent/new/', views.consent_create, name='consent_create'),
     path('consent/<int:pk>/edit/', views.consent_edit, name='consent_edit'),
     path('consent/<int:pk>/delete/', views.consent_delete, name='consent_delete'),
@@ -65,6 +62,13 @@ urlpatterns = [
     
     path('content/calendar/', views.content_calendar, name='content_calendar'),
     path('content/<int:pk>/status/<str:new_status>/', views.content_transition, name='content_transition'),
+    
+    
+        # Public lead form (no auth)
+    path('lead-form/', views.public_lead_form, name='public_lead_form'),
+    path('lead-form/api/', views.public_lead_form_api, name='public_lead_form_api'),
+    
+    path('reports/weekly/', views.weekly_report_preview, name='weekly_report_preview'),
     
      
 ]
