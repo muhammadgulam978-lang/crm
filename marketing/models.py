@@ -392,3 +392,94 @@ class LinkedInCredential(models.Model):
         return f'LinkedIn credentials for {self.user}'
     
     
+
+
+
+
+
+
+class LeadStage(models.Model):
+    """
+    Lifecycle stage per lead (Prompt 3).
+    Distinct from Lead.status which is a CRM-level status.
+    This is the marketing automation lifecycle.
+    """
+    lead = models.OneToOneField(
+        'leads.Lead', on_delete=models.CASCADE,
+        related_name='marketing_stage',
+    )
+    stage = models.CharField(
+        max_length=20, choices=C.STAGE_CHOICES,
+        default=C.STAGE_NEW, db_index=True,
+    )
+    reason = models.TextField(blank=True, help_text='Why did the lead move here?')
+    updated_by = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+',
+    )
+    entered_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # History (JSON list of {stage, at, by, reason})
+    history = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['stage', 'entered_at']),
+        ]
+
+    def __str__(self):
+        return f'Lead#{self.lead_id}: {self.stage}'
+
+    def set_stage(self, new_stage, *, reason='', user=None):
+        """Idempotent stage transition with history."""
+        if new_stage not in dict(C.STAGE_CHOICES):
+            raise ValidationError(f'Invalid stage: {new_stage}')
+        if new_stage == self.stage:
+            return False
+
+        old = self.stage
+        self.stage = new_stage
+        self.reason = reason
+        self.updated_by = user
+        self.entered_at = timezone.now()
+        self.history.append({
+            'from': old,
+            'to': new_stage,
+            'at': timezone.now().isoformat(),
+            'by': user.username if user else 'system',
+            'reason': reason[:200],
+        })
+        # Cap history at 100 entries
+        if len(self.history) > 100:
+            self.history = self.history[-100:]
+        self.save()
+        return True
+
+
+class AutomationRunLog(models.Model):
+    """Idempotency log — prevent duplicate tasks/messages per lead per step."""
+    lead = models.ForeignKey('leads.Lead', on_delete=models.CASCADE, related_name='automation_logs')
+    run = models.ForeignKey(AutomationRun, null=True, blank=True,
+                            on_delete=models.SET_NULL, related_name='logs')
+    step_kind = models.CharField(max_length=40)
+    dedup_key = models.CharField(max_length=120, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['lead', 'dedup_key'],
+                name='mkt_unique_automation_log_per_lead_key',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['lead', 'step_kind']),
+        ]
+
+    def __str__(self):
+        return f'Log {self.step_kind} lead#{self.lead_id}: {self.dedup_key[:40]}'

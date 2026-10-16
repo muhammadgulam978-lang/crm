@@ -204,3 +204,40 @@ REFERRER_KIND_CHOICES = [
 ]
 
 MAX_AUTOMATION_ATTEMPTS = 5
+
+
+
+
+
+
+# ============================================================================
+# LEAD LIFECYCLE STAGES 
+# ============================================================================
+STAGE_NEW = 'new'
+STAGE_RESEARCHED = 'researched'
+STAGE_QUALIFIED = 'qualified'
+STAGE_CONTACTED = 'contacted'
+STAGE_REPLIED = 'replied'
+STAGE_MEETING = 'meeting'
+STAGE_PROPOSAL = 'proposal'
+STAGE_NEGOTIATION = 'negotiation'
+STAGE_WON = 'won'
+STAGE_LOST = 'lost'
+STAGE_NURTURE = 'nurture'
+
+STAGE_CHOICES = [
+    (STAGE_NEW, 'New'),
+    (STAGE_RESEARCHED, 'Researched'),
+    (STAGE_QUALIFIED, 'Qualified'),
+    (STAGE_CONTACTED, 'Contacted'),
+    (STAGE_REPLIED, 'Replied'),
+    (STAGE_MEETING, 'Meeting'),
+    (STAGE_PROPOSAL, 'Proposal'),
+    (STAGE_NEGOTIATION, 'Negotiation'),
+    (STAGE_WON, 'Won'),
+    (STAGE_LOST, 'Lost'),
+    (STAGE_NURTURE, 'Nurture'),
+]
+
+# Which stages should pause all automation
+STAGES_PAUSE_AUTOMATION = {STAGE_WON, STAGE_LOST, STAGE_REPLIED, STAGE_NURTURE}

@@ -62,13 +62,13 @@ urlpatterns = [
     
     path('content/calendar/', views.content_calendar, name='content_calendar'),
     path('content/<int:pk>/status/<str:new_status>/', views.content_transition, name='content_transition'),
-    
-    
+
         # Public lead form (no auth)
     path('lead-form/', views.public_lead_form, name='public_lead_form'),
     path('lead-form/api/', views.public_lead_form_api, name='public_lead_form_api'),
-    
+    # marketing reports
     path('reports/weekly/', views.weekly_report_preview, name='weekly_report_preview'),
+   
     
      
 ]

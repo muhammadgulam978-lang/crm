@@ -25,28 +25,31 @@ from . import constants as C
 # Marketing Center — admin / manager / CEO only (superuser auto-passes)
 marketing_access = role_required('admin', 'sales_manager', 'ceo')
 
-
 @marketing_access
 def dashboard(request):
-    now = timezone.now()
-    since_30 = now - timedelta(days=30)
+    from marketing.services import analytics
 
-    campaigns = Campaign.objects.all()
+    days = int(request.GET.get('days', 30))
+    if days not in (7, 14, 30, 90):
+        days = 30
 
-    sources_with_leads = (
-        ProspectSource.objects
-        .annotate(lead_count=Count('leads', filter=Q(leads__created_at__gte=since_30)))
-        .filter(lead_count__gt=0)
-        .order_by('-lead_count')[:8]
-    )
+    kpi_data = analytics.kpis(days=days)
+    kpi_data['revenue_by_source'] = analytics.revenue_by_source(days=days)
 
-    by_channel = (
-        MarketingConsent.objects
-        .filter(status=C.CONSENT_GRANTED)
-        .values('channel')
-        .annotate(n=Count('id'))
-        .order_by('-n')
-    )
+    data = {
+        'active': 'marketing',
+        'days': days,
+        'kpis': kpi_data,
+        'sources': analytics.source_performance(days=days),
+        'funnel': analytics.conversion_funnel(days=days),
+        'lost_reasons': analytics.lost_reasons(days=days * 3),
+        'content': analytics.content_performance(days=days),
+        'hot_leads': analytics.hot_leads(days=days),
+        'reactivation': analytics.reactivation_table(days=60),
+        'recent_campaigns': Campaign.objects.order_by('-created_at')[:5],
+        'recent_drafts': analytics.recent_drafts(limit=10),
+    }
+    return render(request, 'marketing/dashboard.html', data)
 
     # Lead funnel by marketing_source (uses Lead.marketing_source if you added it)
     has_mkt_source = hasattr(Lead, 'marketing_source')
