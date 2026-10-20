@@ -1,0 +1,153 @@
+{% extends 'leads/base.html' %}
+{% block title %}Marketing Center{% endblock %}
+{% block content %}
+<div class="list-header">
+  <h2 class="page-title">Marketing Center</h2>
+  <div class="filters">
+    <a href="?days=7"  class="btn btn-small {% if days == 7 %}on{% endif %}">7d</a>
+    <a href="?days=14" class="btn btn-small {% if days == 14 %}on{% endif %}">14d</a>
+    <a href="?days=30" class="btn btn-small {% if days == 30 %}on{% endif %}">30d</a>
+    <a href="?days=90" class="btn btn-small {% if days == 90 %}on{% endif %}">90d</a>
+  </div>
+</div>
+
+{# ============= KPI CARDS ============= #}
+<div class="kpi-grid">
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Drafts waiting</div><div class="kpi-value">{{ kpis.messages_drafted }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">New leads</div><div class="kpi-value">{{ kpis.total_leads }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">HOT 🔥</div><div class="kpi-value" style="color:#b91c1c">{{ kpis.hot }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">WARM</div><div class="kpi-value" style="color:#b45309">{{ kpis.warm }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">COLD</div><div class="kpi-value" style="color:#0e7490">{{ kpis.cold }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Won</div><div class="kpi-value" style="color:#047857">{{ kpis.won }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Lost</div><div class="kpi-value" style="color:#64748b">{{ kpis.lost }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Conversion rate</div><div class="kpi-value">{{ kpis.conversion_rate }}%</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Revenue</div><div class="kpi-value">{{ kpis.revenue }}</div></div></div>
+</div>
+
+<div class="kpi-grid" style="margin-top:12px">
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Meetings</div><div class="kpi-value">{{ kpis.meetings }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Proposals</div><div class="kpi-value">{{ kpis.proposals }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Follow-ups pending</div><div class="kpi-value">{{ kpis.followups_pending }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Automation active</div><div class="kpi-value">{{ kpis.automation_active }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Reactivation pool</div><div class="kpi-value">{{ kpis.reactivation_count }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Referrals pending</div><div class="kpi-value">{{ kpis.referrals_pending }}</div></div></div>
+</div>
+
+<div class="kpi-grid" style="margin-top:12px">
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Replies ({{ days }}d)</div><div class="kpi-value" style="color:#0e7490">{{ kpis.replies }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Drafts waiting</div><div class="kpi-value" style="color:#b45309">{{ kpis.messages_drafted }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Drafts approved</div><div class="kpi-value" style="color:#0a66c2">{{ kpis.messages_approved }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-body"><div class="kpi-label">Messages sent</div><div class="kpi-value" style="color:#047857">{{ kpis.messages_sent }}</div></div></div>
+</div>
+
+
+<div class="card" style="margin-top:20px; padding:20px">
+  <h3 style="margin-top:0">Revenue by source ({{ days }}d)</h3>
+  <table class="items-table"><thead>
+    <tr><th>Source</th><th style="text-align:right">Payments</th><th style="text-align:right">Total</th></tr>
+  </thead><tbody>
+    {% for r in kpis.revenue_by_source %}
+    <tr><td>{{ r.source }}</td><td style="text-align:right">{{ r.count }}</td><td style="text-align:right"><strong>{{ r.total }}</strong></td></tr>
+    {% empty %}<tr><td colspan="3" class="capi-muted" style="text-align:center">No attributed revenue yet.</td></tr>
+    {% endfor %}
+  </tbody></table>
+</div>
+
+{# ============= FUNNEL ============= #}
+<div class="card" style="margin-top:20px; padding:20px">
+  <h3 style="margin-top:0">Conversion Funnel ({{ days }}d)</h3>
+  {% for stage in funnel %}
+    {% if stage.count %}
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:2px">
+        <span>{{ stage.label }}</span>
+        <strong>{{ stage.count }}</strong>
+      </div>
+      <div style="background:#eef2ff;height:20px;border-radius:4px;overflow:hidden">
+        <div style="background:linear-gradient(90deg,#4f46e5,#7c3aed);height:100%;width:{{ stage.pct_width }}%"></div>
+      </div>
+    </div>
+    {% endif %}
+  {% empty %}
+  <p class="capi-muted">No leads in this window.</p>
+  {% endfor %}
+</div>
+
+{# ============= SOURCE PERFORMANCE ============= #}
+<div class="capi-grid" style="margin-top:20px">
+  <div class="card" style="padding:20px">
+    <h3 style="margin-top:0">Lead source performance</h3>
+    <table class="items-table"><thead>
+      <tr><th>Source</th><th>Kind</th><th style="text-align:right">Leads</th><th style="text-align:right">Won</th><th style="text-align:right">CVR</th></tr>
+    </thead><tbody>
+      {% for s in sources %}
+      <tr><td>{{ s.name }}</td><td class="capi-muted">{{ s.kind }}</td><td style="text-align:right">{{ s.total }}</td><td style="text-align:right">{{ s.won }}</td><td style="text-align:right"><strong>{{ s.conversion_rate }}%</strong></td></tr>
+      {% empty %}<tr><td colspan="5" class="capi-muted" style="text-align:center">No source-attributed leads.</td></tr>
+      {% endfor %}
+    </tbody></table>
+  </div>
+
+  <div class="card" style="padding:20px">
+    <h3 style="margin-top:0">Lost reasons (last 90d)</h3>
+    <table class="items-table"><thead><tr><th>Reason</th><th style="text-align:right">Count</th></tr></thead><tbody>
+      {% for r in lost_reasons %}
+      <tr><td>{{ r.reason }}</td><td style="text-align:right">{{ r.count }}</td></tr>
+      {% empty %}<tr><td colspan="2" class="capi-muted" style="text-align:center">No lost leads yet.</td></tr>
+      {% endfor %}
+    </tbody></table>
+  </div>
+</div>
+
+{# ============= HOT LEADS ============= #}
+<div class="card" style="margin-top:20px; padding:20px">
+  <h3 style="margin-top:0">🔥 HOT leads needing attention</h3>
+  <table class="items-table"><thead>
+    <tr><th>Name</th><th>Source</th><th>Stage</th><th>Score</th><th>Assigned to</th><th>Created</th></tr>
+  </thead><tbody>
+    {% for l in hot_leads %}
+    <tr>
+      <td><a href="/leads/{{ l.id }}/">{{ l.name }}</a></td>
+      <td>{{ l.source }}</td>
+      <td>{{ l.stage }}</td>
+      <td><strong style="color:#b91c1c">{{ l.score }}</strong></td>
+      <td>{{ l.spo }}</td>
+      <td>{{ l.created_at|date:"d M" }}</td>
+    </tr>
+    {% empty %}<tr><td colspan="6" class="capi-muted" style="text-align:center">No HOT leads in this window.</td></tr>
+    {% endfor %}
+  </tbody></table>
+</div>
+
+{# ============= REACTIVATION ============= #}
+<div class="card" style="margin-top:20px; padding:20px">
+  <h3 style="margin-top:0">Reactivation opportunities (60d dormant)</h3>
+  <table class="items-table"><thead>
+    <tr><th>Name</th><th>Score</th><th>Last contact</th><th>Recommended action</th><th>Reason</th></tr>
+  </thead><tbody>
+    {% for r in reactivation %}
+    <tr>
+      <td><a href="/leads/{{ r.id }}/">{{ r.name }}</a></td>
+      <td>{{ r.score }}</td>
+      <td>{% if r.last_contact %}{{ r.last_contact|date:"d M Y" }}{% else %}—{% endif %}</td>
+      <td>{{ r.action }}</td>
+      <td class="capi-muted">{{ r.reason }}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5" class="capi-muted" style="text-align:center">No reactivation candidates.</td></tr>
+    {% endfor %}
+  </tbody></table>
+  <p style="margin-top:10px"><a href="/marketing/reactivation/" class="btn btn-small">Open full reactivation center</a></p>
+</div>
+
+{# ============= CONTENT ============= #}
+<div class="card" style="margin-top:20px; padding:20px">
+  <h3 style="margin-top:0">Content performance ({{ days }}d)</h3>
+  <table class="items-table"><thead>
+    <tr><th>Title</th><th>Kind</th><th>Campaign</th><th>Published</th></tr>
+  </thead><tbody>
+    {% for c in content %}
+    <tr><td>{{ c.title }}</td><td class="capi-muted">{{ c.kind }}</td><td>{{ c.campaign }}</td><td>{{ c.published_at|date:"d M Y" }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="capi-muted" style="text-align:center">No content published yet.</td></tr>
+    {% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

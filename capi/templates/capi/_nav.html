@@ -1,22 +1,41 @@
 <style>
-.capi-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
-.capi-nav a{padding:7px 14px;border-radius:20px;background:#fff;border:1px solid var(--border,#ddd);font-size:13px;color:inherit;text-decoration:none}
-.capi-nav a.on{background:var(--brand-grad,#4f46e5);color:#fff;border-color:transparent}
-.capi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
-.capi-mono{font-family:monospace;font-size:12px;word-break:break-all}
-.capi-muted{color:var(--text-muted,#888);font-size:12.5px}
-.capi-pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;font-size:12px;max-height:320px}
-.capi-inline{display:inline}
+.capi-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 24px;
+}
+.capi-nav a {
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.capi-nav a:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+.capi-nav a.on {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
 </style>
 <div class="capi-nav">
+  <a href="#" class="{% if nav == 'overview' %}on{% endif %}">Overview</a> <!-- 'overview' nav state add karein agar zaroorat ho -->
   <a href="{% url 'marketing:content_list' %}">Drafts</a>
-  <a href="{% url 'capi:dashboard' %}" class="{% if nav == 'dashboard' %}on{% endif %}">Dashboard</a>
-  <a href="{% url 'capi:connections' %}" class="{% if nav == 'connections' %}on{% endif %}">Connections</a>
-  <a href="{% url 'capi:meta_event_list' %}" class="{% if nav == 'leadads' %}on{% endif %}">Lead Ads</a>
-  <a href="{% url 'capi:config_list' %}" class="{% if nav == 'mapping' %}on{% endif %}">Event mapping</a>
-  <a href="{% url 'capi:event_list' %}?tab=queue" class="{% if nav == 'queue' %}on{% endif %}">Queue</a>
-  <a href="{% url 'capi:event_list' %}?tab=sent" class="{% if nav == 'sent' %}on{% endif %}">Sent</a>
-  <a href="{% url 'capi:event_list' %}?tab=failed" class="{% if nav == 'failed' %}on{% endif %}">Failed</a>
-  <a href="{% url 'capi:event_list' %}?tab=retry" class="{% if nav == 'retry' %}on{% endif %}">Retry</a>
-  <a href="{% url 'capi:log_list' %}" class="{% if nav == 'logs' %}on{% endif %}">Logs</a>
+  <a href="{% url 'capi:connections' %}">Connections</a>
+  <a href="{% url 'capi:meta_event_list' %}">Lead Ads</a>
+  <a href="{% url 'capi:config_list' %}">Event Mapping</a>
+  <a href="{% url 'capi:event_list' %}?tab=queue">Queue</a>
+  <a href="{% url 'capi:event_list' %}?tab=sent">Sent</a>
+  <a href="{% url 'capi:event_list' %}?tab=failed">Failed</a>
+  <a href="{% url 'capi:event_list' %}?tab=retry">Retry</a>
+  <a href="{% url 'capi:log_list' %}">Logs</a>
 </div>

@@ -1,13 +1,10 @@
 from datetime import timedelta
 from unittest import mock
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-
 from leads.models import Company, CommunicationLog, Contact, Lead, Meeting, Opportunity, SalesPerson
-
 from . import extraction, offers, rules, services
 from .llm import AIUnavailable
 from .models import (CallBrief, ConversationDraft, CustomerFact, LeadInsight, NextAction, OfferDecision, OverrideLog,

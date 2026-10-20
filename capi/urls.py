@@ -6,7 +6,9 @@ app_name = 'capi'
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+     # Connections — list + individual platform pages
     path('connections/', views.connections, name='connections'),
+    path('connections/<str:platform>/', views.connection_detail, name='connection_detail'),
     path('connections/<str:platform>/test/', views.connection_test, name='connection_test'),
     path('mapping/', views.config_list, name='config_list'),
     path('mapping/new/', views.config_edit, name='config_create'),

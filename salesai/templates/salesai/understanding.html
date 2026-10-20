@@ -1,30 +1,199 @@
 {% extends 'leads/base.html' %}
-{% block title %}Customer understanding - Raabta 360{% endblock %}
+{% block title %}Customer Understanding - Raabta 360{% endblock %}
+
 {% block content %}
-<h1 class="page-title">Customer understanding</h1>
-{% include 'salesai/_nav.html' %}
-<div class="kpi-grid">
- <div class="kpi-card"><div class="kpi-body"><div class="kpi-value">{{ s.active_leads }}</div><div class="kpi-label">Active leads</div></div></div>
- <div class="kpi-card green"><div class="kpi-body"><div class="kpi-value">{{ s.reviewed_leads }}</div><div class="kpi-label">Reviewed by AI</div></div></div>
- <div class="kpi-card orange"><div class="kpi-body"><div class="kpi-value">{{ s.assumptions_pending }}</div><div class="kpi-label">Assumptions to confirm</div></div></div>
-</div>
-<p class="row-subtext" style="margin:10px 0;">Counts below use <b>verified</b> facts only (quoted from a CRM record or confirmed by a salesperson). Assumptions are never counted.</p>
-<div class="sa-grid">
- <div class="card"><h3 class="section-heading">Repeated customer needs &amp; requirements</h3>
- <table><tbody>{% for r in s.needs %}<tr><td>{{ r.label }}<div class="sa-ev">{% for e in r.examples %}<a href="{% url 'salesai:workspace' e.lead_id %}">{{ e.lead }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</div></td><td><b>{{ r.count }}</b> lead{{ r.count|pluralize }}</td></tr>
- {% empty %}<tr><td class="empty-state">No verified needs yet. Run "Analyze with AI" on leads.</td></tr>{% endfor %}</tbody></table></div>
- <div class="card"><h3 class="section-heading">Common objections</h3>
- <table><tbody>{% for r in s.objections %}<tr><td>{{ r.label }}<div class="sa-ev">{% for e in r.examples %}<a href="{% url 'salesai:workspace' e.lead_id %}">{{ e.lead }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</div></td><td><b>{{ r.count }}</b></td></tr>
- {% empty %}<tr><td class="empty-state">No objections recorded.</td></tr>{% endfor %}</tbody></table></div>
- <div class="card"><h3 class="section-heading">Unanswered customer questions</h3>
- <table><tbody>{% for f in s.unanswered %}<tr><td><a href="{% url 'salesai:workspace' f.lead_id %}">{{ f.lead.name }}</a><div class="sa-ev">{{ f.value }} &middot; {{ f.created_at|date:"d M" }}</div></td></tr>
- {% empty %}<tr><td class="empty-state">None.</td></tr>{% endfor %}</tbody></table></div>
- <div class="card"><h3 class="section-heading">Missing information (active leads)</h3>
- <table><tbody>{% for k,n in s.missing.items %}<tr><td>{{ k|title }}</td><td><b>{{ n }}</b> lead{{ n|pluralize }}</td></tr>{% empty %}<tr><td class="empty-state">Nothing analysed yet.</td></tr>{% endfor %}</tbody></table></div>
- <div class="card"><h3 class="section-heading">Competitors / current solutions</h3>
- <table><tbody>{% for r in s.competitors %}<tr><td>{{ r.label }}</td><td><b>{{ r.count }}</b></td></tr>{% empty %}<tr><td class="empty-state">None recorded.</td></tr>{% endfor %}</tbody></table></div>
- <div class="card"><h3 class="section-heading">Campaign results</h3>
- <table><thead><tr><th>Campaign</th><th>Leads</th><th>Need verified</th><th>Near-term</th></tr></thead><tbody>{% for c in s.campaigns %}<tr><td>{{ c.name }}</td><td>{{ c.leads }}</td><td>{{ c.need_verified }}</td><td>{{ c.near_term }}</td></tr>
- {% empty %}<tr><td colspan="4" class="empty-state">No campaign data.</td></tr>{% endfor %}</tbody></table></div>
+<style>
+  .cu-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f8fafc; padding: 24px; color: #1e293b; }
+  .cu-header { margin-bottom: 24px; }
+  .cu-header h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; color: #0f172a; }
+  .cu-header p { margin: 0; font-size: 13.5px; color: #64748b; }
+  
+  /* Tabs */
+  .ai-nav-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .ai-nav-tabs a { padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 500; color: #475569; text-decoration: none; background: #fff; border: 1px solid #e2e8f0; }
+  .ai-nav-tabs a.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+  /* KPI */
+  .cu-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .cu-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; }
+  .cu-kpi-val { font-size: 28px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+  .cu-kpi-label { font-size: 13px; font-weight: 500; color: #64748b; }
+  
+  /* Grid Layout for Cards */
+  .cu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  @media (max-width: 900px) { .cu-grid { grid-template-columns: 1fr; } }
+  
+  .cu-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; }
+  .cu-card-title { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; }
+  
+  .cu-list-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f8fafc; font-size: 13px; }
+  .cu-list-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .cu-item-text { color: #334155; flex: 1; padding-right: 10px; }
+  .cu-item-meta { font-size: 11.5px; color: #64748b; margin-top: 4px; }
+  .cu-item-count { font-weight: 600; color: #2563eb; background: #eff6ff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
+  
+  .cu-empty { font-size: 13px; color: #94a3b8; font-style: italic; padding: 10px 0; }
+</style>
+
+<div class="cu-wrap">
+  
+  <!-- Header -->
+  <div class="cu-header">
+    <h1>Customer Understanding</h1>
+    <p>Verified needs, objections, and insights extracted from your CRM records by AI.</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="ai-nav-tabs">
+    <a href="{% url 'salesai:dashboard' %}">Overview</a>
+    <a href="{% url 'salesai:next_actions' %}">Next Actions</a>
+    <a href="{% url 'salesai:understanding' %}" class="active">Customer Insights</a>
+    <a href="#">Product Knowledge</a>
+    <a href="{% url 'salesai:overrides' %}">AI Overrides</a>
+    <a href="#">Settings</a>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="cu-kpi-grid">
+    <div class="cu-kpi-card">
+      <div class="cu-kpi-val">{{ s.active_leads }}</div>
+      <div class="cu-kpi-label">Active leads</div>
+    </div>
+    <div class="cu-kpi-card">
+      <div class="cu-kpi-val" style="color: #16a34a;">{{ s.reviewed_leads }}</div>
+      <div class="cu-kpi-label">Reviewed by AI</div>
+    </div>
+    <div class="cu-kpi-card">
+      <div class="cu-kpi-val" style="color: #d97706;">{{ s.assumptions_pending }}</div>
+      <div class="cu-kpi-label">Assumptions to confirm</div>
+    </div>
+  </div>
+  
+  <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">
+    <b>Note:</b> Counts below use verified facts only (quoted from a CRM record or confirmed by a salesperson). Assumptions are never counted.
+  </p>
+
+  <!-- Cards Grid -->
+  <div class="cu-grid">
+    
+    <!-- Needs & Requirements -->
+    <div class="cu-card">
+      <div class="cu-card-title"><span>🎯</span> Repeated customer needs & requirements</div>
+      {% for r in s.needs %}
+      <div class="cu-list-item">
+        <div>
+          <div class="cu-item-text">{{ r.label }}</div>
+          <div class="cu-item-meta">
+            {% for e in r.examples %}
+              <a href="{% url 'salesai:workspace' e.lead_id %}" style="color:#2563eb; text-decoration:none;">{{ e.lead }}</a>{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        <div class="cu-item-count">{{ r.count }} lead{{ r.count|pluralize }}</div>
+      </div>
+      {% empty %}
+      <div class="cu-empty">No verified needs yet. Run "Analyze with AI" on leads.</div>
+      {% endfor %}
+    </div>
+
+    <!-- Objections -->
+    <div class="cu-card">
+      <div class="cu-card-title"><span>🛑</span> Common objections</div>
+      {% for r in s.objections %}
+      <div class="cu-list-item">
+        <div>
+          <div class="cu-item-text">{{ r.label }}</div>
+          <div class="cu-item-meta">
+            {% for e in r.examples %}
+              <a href="{% url 'salesai:workspace' e.lead_id %}" style="color:#2563eb; text-decoration:none;">{{ e.lead }}</a>{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        <div class="cu-item-count">{{ r.count }}</div>
+      </div>
+      {% empty %}
+      <div class="cu-empty">No objections recorded.</div>
+      {% endfor %}
+    </div>
+
+    <!-- Unanswered Questions -->
+    <div class="cu-card">
+      <div class="cu-card-title"><span>❓</span> Unanswered customer questions</div>
+      {% for f in s.unanswered %}
+      <div class="cu-list-item">
+        <div>
+          <div class="cu-item-text"><a href="{% url 'salesai:workspace' f.lead_id %}" style="color:#2563eb; text-decoration:none; font-weight:600;">{{ f.lead.name }}</a></div>
+          <div class="cu-item-meta">{{ f.value }} &middot; {{ f.created_at|date:"d M" }}</div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="cu-empty">None.</div>
+      {% endfor %}
+    </div>
+
+    <!-- Missing Info -->
+    <div class="cu-card">
+      <div class="cu-card-title"><span>📝</span> Missing information (active leads)</div>
+      {% for k,n in s.missing.items %}
+      <div class="cu-list-item">
+        <div class="cu-item-text" style="text-transform: capitalize;">{{ k }}</div>
+        <div class="cu-item-count">{{ n }} lead{{ n|pluralize }}</div>
+      </div>
+      {% empty %}
+      <div class="cu-empty">Nothing analysed yet.</div>
+      {% endfor %}
+    </div>
+
+    <!-- Competitors -->
+    <div class="cu-card">
+      <div class="cu-card-title"><span>🏢</span> Competitors / current solutions</div>
+      {% for r in s.competitors %}
+      <div class="cu-list-item">
+        <div class="cu-item-text">{{ r.label }}</div>
+        <div class="cu-item-count">{{ r.count }}</div>
+      </div>
+      {% empty %}
+      <div class="cu-empty">None recorded.</div>
+      {% endfor %}
+    </div>
+
+    <!-- Campaigns -->
+    <div class="cu-card">
+      <div class="cu-card-title"><span>📊</span> Campaign results</div>
+      {% if s.campaigns %}
+      <div style="overflow-x: auto;">
+        <table style="width:100%; font-size:13px; text-align:left; border-collapse: collapse;">
+          <thead>
+            <tr style="color:#64748b; font-size:11px; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
+              <th style="padding-bottom:8px;">Campaign</th>
+              <th style="padding-bottom:8px;">Leads</th>
+              <th style="padding-bottom:8px;">Need Verified</th>
+              <th style="padding-bottom:8px;">Near-term</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in s.campaigns %}
+            <tr style="border-bottom:1px solid #f8fafc;">
+              <td style="padding:10px 0; font-weight:500;">{{ c.name }}</td>
+              <td style="padding:10px 0;">{{ c.leads }}</td>
+              <td style="padding:10px 0;">{{ c.need_verified }}</td>
+              <td style="padding:10px 0;">{{ c.near_term }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="cu-empty">No campaign data.</div>
+      {% endif %}
+    </div>
+
+  </div>
 </div>
 {% endblock %}
+
+
+
+
+
+

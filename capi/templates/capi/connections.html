@@ -1,65 +1,68 @@
 {% extends 'leads/base.html' %}
-{% block title %}CAPI connections{% endblock %}
+{% block title %}Platform Connections{% endblock %}
 {% block content %}
-<div class="list-header"><h2 class="page-title">Platform Connections</h2></div>
-{% include 'capi/_nav.html' with nav='connections' %}
-
-<div class="table-card" style="padding:16px 20px;margin-bottom:18px">
-  <h3 style="margin:0 0 6px">Meta Lead Ads — integration status
-    {% if meta.ready %}<span class="badge badge-green">ready to receive</span>{% else %}<span class="badge badge-orange">setup incomplete</span>{% endif %}</h3>
-  <p class="capi-muted" style="margin:0 0 10px">Callback URL for Meta App Dashboard → Webhooks → Page → <code>leadgen</code>:</p>
-  <pre class="capi-pre" style="max-height:none;margin:0 0 12px">{{ meta.webhook_url }}</pre>
-  <div class="capi-grid" style="margin-bottom:12px">
-    <table class="items-table"><tbody>
-      {% for label, ok, hint in meta.checks %}
-      <tr><td>{{ label }}{% if hint %}<div class="capi-muted">{{ hint }}</div>{% endif %}</td>
-          <td>{% if ok %}<span class="badge badge-green">OK</span>{% else %}<span class="badge badge-red">missing</span>{% endif %}</td></tr>
-      {% endfor %}
-    </tbody></table>
-    <table class="items-table"><tbody>
-      <tr><td>Leads received (30 days)</td><td>{{ meta.counts.received }}</td></tr>
-      <tr><td>Imported into CRM</td><td>{{ meta.counts.imported }}</td></tr>
-      <tr><td>Waiting for automatic retry</td><td>{{ meta.counts.retrying }}</td></tr>
-      <tr><td>Gave up (needs manual retry)</td><td>{% if meta.counts.gave_up %}<span class="badge badge-red">{{ meta.counts.gave_up }}</span>{% else %}0{% endif %}</td></tr>
-      <tr><td>Last signed notification</td><td>{% if meta.conn.last_webhook_at %}{{ meta.conn.last_webhook_at|date:"d M Y, H:i" }}{% else %}—{% endif %}</td></tr>
-      <tr><td>Last handshake</td><td>{% if meta.conn.webhook_verified_at %}{{ meta.conn.webhook_verified_at|date:"d M Y, H:i" }}{% else %}—{% endif %}</td></tr>
-    </tbody></table>
-  </div>
-  {% if meta.last_event and meta.last_event.error and not meta.last_event.processed %}
-  <p class="capi-muted">Latest problem: {{ meta.last_event.error }}</p>{% endif %}
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <form method="post" action="{% url 'capi:meta_subscribe_page' %}">{% csrf_token %}<button class="btn btn-small">Subscribe page to leadgen</button></form>
-    <form method="post" action="{% url 'capi:meta_page_test' %}">{% csrf_token %}<button class="btn btn-small" style="background:#64748b">Test page &amp; subscription</button></form>
-    <a class="btn btn-small" style="background:#64748b" href="{% url 'capi:meta_event_list' %}">View imported leads &amp; failures</a>
-  </div>
+<div class="list-header">
+  <h2 class="page-title">Platform Connections</h2>
+  <p class="capi-muted" style="margin-top:4px">
+    Configure Meta and LinkedIn integrations. Tokens are encrypted at rest and never displayed.
+  </p>
 </div>
 
-<div class="capi-grid">
-{% for conn, form, label in forms %}
-  <div class="form-card"><div class="form-card-header"><h2>{{ label }}</h2></div>
-    <div class="form-card-body" style="padding:20px 28px">
-      <p>Health: {% include 'capi/_status.html' with s=conn.health_status %} &nbsp;Token: {% include 'capi/_status.html' with s=conn.token_status %}
-        {% if conn.token_hint %}<span class="capi-muted">(ends …{{ conn.token_hint }})</span>{% endif %}
-        {% if conn.platform == 'meta' and conn.page_token_hint %}<span class="capi-muted"> · Page token ends …{{ conn.page_token_hint }}</span>{% endif %}</p>
-      {% if conn.health_message %}<p class="capi-muted">{{ conn.health_message }}</p>{% endif %}
-      <form method="post">{% csrf_token %}<input type="hidden" name="platform" value="{{ conn.platform }}">
-        {% include 'capi/_form_fields.html' %}
-        <div class="form-actions"><button class="btn">Save</button></div></form>
-      <form method="post" action="{% url 'capi:connection_test' conn.platform %}" style="margin-top:10px">{% csrf_token %}
-        <button class="btn btn-small" style="background:#64748b">Test connection</button></form>
+{% include 'capi/_nav.html' with nav='connections' %}
+
+<div class="capi-grid" style="margin-top:24px">
+  {% for card in cards %}
+  <a href="{% url 'capi:connection_detail' card.platform %}"
+     class="card"
+     style="padding:24px; text-decoration:none; color:inherit; display:block; transition:all .2s; border:2px solid transparent; cursor:pointer"
+     onmouseover="this.style.borderColor='#4f46e5';this.style.boxShadow='0 4px 16px rgba(79,70,229,.15)'"
+     onmouseout="this.style.borderColor='transparent';this.style.boxShadow=''">
+
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px">
+      <div>
+        <h3 style="margin:0 0 4px;font-size:19px">{{ card.label }}</h3>
+        <p class="capi-muted" style="margin:0;font-size:12.5px;line-height:1.5">
+          {{ card.description }}
+        </p>
+      </div>
     </div>
-  </div>
 
-  {% if conn.platform == 'linkedin' %}
-<form method="post" action="{% url 'capi:linkedin_leadsync_test' %}" style="margin-top:6px">{% csrf_token %}
-  <button class="btn btn-small" style="background:#0a66c2">Test Lead Sync (org access)</button>
-</form>
-<p class="capi-muted" style="margin-top:10px">
-  Webhook URL for LinkedIn (paste into your LinkedIn app's Webhooks → Lead notifications URL):<br>
-  <span class="capi-mono">{{ request.scheme }}://{{ request.get_host }}/capi/webhook/linkedin/</span>
-</p>
-{% endif %}
+    <div style="display:flex; gap:16px; margin-bottom:16px; font-size:12.5px">
+      <div>
+        <div class="capi-muted" style="margin-bottom:2px">Status</div>
+        {% if card.conn.is_active %}
+          <span class="badge badge-green">active</span>
+        {% else %}
+          <span class="badge badge-purple">inactive</span>
+        {% endif %}
+      </div>
+      <div>
+        <div class="capi-muted" style="margin-bottom:2px">Health</div>
+        {% include 'capi/_status.html' with s=card.conn.health_status %}
+      </div>
+      <div>
+        <div class="capi-muted" style="margin-bottom:2px">Token</div>
+        {% include 'capi/_status.html' with s=card.conn.token_status %}
+      </div>
+    </div>
 
-{% endfor %}
+    <div style="display:flex; align-items:center; gap:6px; color:#4f46e5; font-weight:600; font-size:13px; margin-top:16px; padding-top:16px; border-top:1px solid #e2e8f0">
+      Configure
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="card" style="padding:20px 24px; margin-top:20px">
+  <h3 style="margin:0 0 12px; font-size:15px">Why two platforms?</h3>
+  <p class="capi-muted" style="margin:0; font-size:13px; line-height:1.7">
+    Each platform has its own access token, dataset, and webhook. Configuring them separately
+    keeps permissions scoped: Meta tokens never touch LinkedIn data and vice versa.
+    Conversion events from your CRM are only sent after an admin explicitly enables
+    the event mapping in <a href="{% url 'capi:config_list' %}">Event Configuration</a>.
+  </p>
 </div>
 {% endblock %}

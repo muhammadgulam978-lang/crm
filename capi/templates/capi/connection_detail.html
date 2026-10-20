@@ -1,0 +1,130 @@
+{% extends 'leads/base.html' %}
+{% block title %}{{ label }} — Connection{% endblock %}
+{% block content %}
+
+{# Back link #}
+<div style="margin-bottom:16px">
+  <a href="{% url 'capi:connections' %}" style="color:#64748b;text-decoration:none;font-size:13px;display:inline-flex;align-items:center;gap:6px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    All connections
+  </a>
+</div>
+
+<div class="list-header" style="display:flex; justify-content:space-between; align-items:flex-start">
+  <div>
+    <h2 class="page-title">{{ label }}</h2>
+    <p class="capi-muted" style="margin-top:4px">
+      <strong>Health:</strong> {% include 'capi/_status.html' with s=conn.health_status %}
+      &nbsp;·&nbsp;
+      <strong>Token:</strong> {% include 'capi/_status.html' with s=conn.token_status %}
+      {% if conn.token_hint %}<span class="capi-muted">(…{{ conn.token_hint }})</span>{% endif %}
+    </p>
+    {% if conn.health_message %}
+    <p class="capi-muted" style="margin:8px 0 0;font-size:12px;max-width:600px">
+      {{ conn.health_message|truncatechars:250 }}
+    </p>
+    {% endif %}
+  </div>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <form method="post" action="{% url 'capi:connection_test' platform %}">
+      {% csrf_token %}
+      <button class="btn btn-small" style="background:#64748b;color:#fff">Test API</button>
+    </form>
+    {% if platform == 'meta' %}
+    <form method="post" action="{% url 'capi:meta_subscribe_page' %}">
+      {% csrf_token %}
+      <button class="btn btn-small" style="background:#1877f2;color:#fff">Subscribe page</button>
+    </form>
+    {% endif %}
+    {% if platform == 'linkedin' %}
+      {% url 'capi:linkedin_leadsync_test' as li_test_url %}
+      {% if li_test_url %}
+      <form method="post" action="{{ li_test_url }}">
+        {% csrf_token %}
+        <button class="btn btn-small" style="background:#0a66c2;color:#fff">Test Lead Sync</button>
+      </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% include 'capi/_nav.html' with nav='connections' %}
+
+{# ============================================================ #}
+{# Configuration form                                           #}
+{# ============================================================ #}
+<div class="card" style="padding:24px 28px; margin-top:20px">
+  <h3 style="margin:0 0 4px;font-size:17px">Configuration</h3>
+  <p class="capi-muted" style="margin:0 0 20px;font-size:13px">
+    Tokens are stored encrypted. Leave the access token fields blank to keep the existing value.
+  </p>
+
+  <form method="post">
+    {% csrf_token %}
+    {% include 'capi/_form_fields.html' with form=form %}
+
+    <div class="form-actions" style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:12px">
+      <a href="{% url 'capi:connections' %}" style="padding:10px 16px;color:#64748b;text-decoration:none;font-size:14px">Cancel</a>
+      <button class="btn">Save {{ label }}</button>
+    </div>
+  </form>
+</div>
+
+{# ============================================================ #}
+{# Webhook section                                              #}
+{# ============================================================ #}
+<div class="card" style="padding:24px 28px; margin-top:20px">
+  <h3 style="margin:0 0 4px;font-size:17px">
+    {% if platform == 'meta' %}Lead Ads Webhook{% else %}Lead Sync Webhook{% endif %}
+  </h3>
+  <p class="capi-muted" style="margin:0 0 16px;font-size:13px">
+    {% if platform == 'meta' %}
+      Add the Page ID, Page Access Token, and a random Webhook Verify Token above.
+      Then paste this URL in <strong>Meta App Dashboard → Webhooks → Callback URL</strong>:
+    {% else %}
+      Paste this URL in <strong>LinkedIn App Dashboard → Webhooks → Lead notifications URL</strong>:
+    {% endif %}
+  </p>
+
+  <div style="background:#0f172a;color:#e2e8f0;padding:14px 18px;border-radius:8px;font-family:'SF Mono','Consolas',monospace;font-size:12.5px;word-break:break-all;margin-bottom:16px;position:relative">
+    {{ webhook_url }}
+  </div>
+
+  {% if platform == 'meta' %}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <div class="capi-muted" style="font-size:12px;margin-bottom:4px">Subscribe to field</div>
+      <code style="background:#f1f5f9;padding:4px 8px;border-radius:4px;font-size:12.5px">leadgen</code>
+    </div>
+    <div>
+      <div class="capi-muted" style="font-size:12px;margin-bottom:4px">Verify Token</div>
+      <code style="background:#f1f5f9;padding:4px 8px;border-radius:4px;font-size:12.5px">
+        {{ conn.webhook_verify_token|default:"not set — add it above" }}
+      </code>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ============================================================ #}
+{# Help / tips section                                          #}
+{# ============================================================ #}
+<div class="card" style="padding:20px 24px; margin-top:20px">
+  <h3 style="margin:0 0 12px;font-size:15px">Troubleshooting tips</h3>
+  <ul class="capi-muted" style="margin:0;padding-left:20px;font-size:13px;line-height:1.8">
+    {% if platform == 'meta' %}
+      <li>Token expired? Generate a new one from <strong>Meta Events Manager → Data Sources → Dataset → Settings → Conversions API → Generate Access Token</strong>.</li>
+      <li>Webhook not receiving? Confirm the Page is subscribed in Meta App Dashboard.</li>
+      <li>Dataset ID is also called "Pixel ID" in Meta's UI.</li>
+    {% else %}
+      <li>Token 401? Regenerate from <strong>LinkedIn Developer Portal → Auth</strong>.</li>
+      <li>Webhook challenge fails? Confirm the Client Secret in <code>settings.py</code> matches LinkedIn app.</li>
+      <li>Lead Gen Forms webhook requires "Lead Sync API" access approval from LinkedIn.</li>
+    {% endif %}
+    <li>Conversions are only sent after enabling event mappings in <a href="{% url 'capi:config_list' %}">Event Configuration</a>.</li>
+  </ul>
+</div>
+
+{% endblock %}

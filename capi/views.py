@@ -94,26 +94,90 @@ def dashboard(request):
     }))
 
 
+# @capi_admin
+# def connections(request):
+#     forms = {}
+#     for platform, label in C.PLATFORM_CHOICES:
+#         conn = _conn(platform)
+#         if request.method == 'POST' and request.POST.get('platform') == platform:
+#             form = ConnectionForm(request.POST, instance=conn, platform=platform)
+#             if form.is_valid():
+#                 form.save()
+#                 messages.success(request, f'{label} connection saved.')
+#                 return redirect('capi:connections')
+#         else:
+#             form = ConnectionForm(instance=conn, platform=platform)
+#         forms[platform] = (conn, form, label)
+
+#     return render(request, 'capi/connections.html', _ctx({
+#         'forms': forms.values(),
+#         'meta': meta_status(request),
+#     }))
+
+
+
 @capi_admin
 def connections(request):
-    forms = {}
+    """
+    Connections LIST — cards showing both platforms with health status.
+    Click a card to open full-page configuration.
+    """
+    from capi import constants as C
+
+    cards = []
     for platform, label in C.PLATFORM_CHOICES:
         conn = _conn(platform)
-        if request.method == 'POST' and request.POST.get('platform') == platform:
-            form = ConnectionForm(request.POST, instance=conn, platform=platform)
-            if form.is_valid():
-                form.save()
-                messages.success(request, f'{label} connection saved.')
-                return redirect('capi:connections')
-        else:
-            form = ConnectionForm(instance=conn, platform=platform)
-        forms[platform] = (conn, form, label)
+        cards.append({
+            'platform': platform,
+            'label': label,
+            'conn': conn,
+            'description': (
+                'Server-side Conversions API (outbound) + Lead Ads webhook (inbound). '
+                'Sends CRM conversion events back to Meta for ad optimization.'
+                if platform == C.PLATFORM_META else
+                'LinkedIn Conversions API (outbound) + Lead Gen Forms webhook (inbound). '
+                'Syncs leads and conversion events with LinkedIn.'
+            ),
+        })
 
-    return render(request, 'capi/connections.html', _ctx({
-        'forms': forms.values(),
-        'meta': meta_status(request),
+    return render(request, 'capi/connections.html', _ctx({'cards': cards}))
+
+
+@capi_admin
+def connection_detail(request, platform):
+    """
+    Single platform full-page configuration.
+    POST saves the form for this platform only.
+    """
+    from capi import constants as C
+
+    if platform not in dict(C.PLATFORM_CHOICES):
+        raise Http404
+
+    conn = _conn(platform)
+    label = dict(C.PLATFORM_CHOICES)[platform]
+
+    if request.method == 'POST':
+        form = ConnectionForm(request.POST, instance=conn, platform=platform)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'{label} connection saved.')
+            return redirect('capi:connection_detail', platform=platform)
+    else:
+        form = ConnectionForm(instance=conn, platform=platform)
+
+    webhook_url = request.build_absolute_uri(
+        '/capi/webhook/meta/' if platform == C.PLATFORM_META
+        else '/capi/webhook/linkedin/'
+    )
+
+    return render(request, 'capi/connection_detail.html', _ctx({
+        'platform': platform,
+        'label': label,
+        'conn': conn,
+        'form': form,
+        'webhook_url': webhook_url,
     }))
-
 
 def meta_status(request):
     """Everything the admin needs to see to know whether Lead Ads are flowing."""
