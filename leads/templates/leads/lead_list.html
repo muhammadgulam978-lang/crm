@@ -32,32 +32,53 @@
             {% endif %}{% endfor %}
         </div>
 
+        {# ===== Bulk delete form: sirf table ko wrap karta hai (filter form se alag) ===== #}
+        <form method="post" action="{% url 'bulk_delete_leads' %}" id="bulkDeleteForm">
+        {% csrf_token %}
+
+        {% if request.user|has_full_access:'leads' %}
+        <div id="bulkBar" style="display:none;align-items:center;gap:12px;padding:8px 12px;margin:10px 0;background:#fff4f4;border:1px solid #f3c4c4;border-radius:8px">
+            <span><b id="bulkCount">0</b> lead(s) selected</span>
+            <button type="submit" class="rb-btn" style="color:var(--rb-red);border-color:var(--rb-red)">&#128465; Delete Selected</button>
+            <button type="button" class="rb-btn" id="bulkClear">Clear</button>
+        </div>
+        {% endif %}
+
         <div style="overflow-x:auto">
         <table class="rb-table">
-            <thead><tr><th>Name</th><th>Contact</th><th>Source</th><th>Status</th><th>AI Score</th><th>SPO</th><th>Created</th><th>Actions</th></tr></thead>
+            <thead><tr>
+                {% if request.user|has_full_access:'leads' %}<th style="width:34px"><input type="checkbox" id="selectAll" title="Select all on this page"></th>{% endif %}
+                <th>Name</th><th>Company</th><th>Contact</th><th>Source</th><th>Status</th><th>AI Score</th><th>SPO</th><th>Created</th><th>Actions</th>
+            </tr></thead>
             <tbody>
             {% for lead in leads %}
             <tr>
+                {% if request.user|has_full_access:'leads' %}<td><input type="checkbox" class="row-check" name="lead_ids" value="{{ lead.pk }}"></td>{% endif %}
                 <td><div class="rb-person"><span class="rb-avatar">{{ lead.name|slice:":1"|upper }}</span>
                     <a class="rb-link" href="{% url 'lead_detail' lead.pk %}">{{ lead.name }}</a>
                     {% if lead.is_duplicate %}<span class="rb-pill p-lost" style="margin-left:4px">Duplicate</span>{% endif %}</div></td>
-                <td><div>{{ lead.contact_number }}</div>{% if lead.email %}<div style="color:var(--rb-muted);font-size:11px">{{ lead.email }}</div>{% endif %}</td>
+                <td>{% if lead.company_name %}{{ lead.company_name }}{% else %}<span style="color:var(--rb-muted)">&mdash;</span>{% endif %}</td>
+                <td>
+                    {% if lead.contact_number %}<div>{{ lead.contact_number }}</div>{% else %}<div style="color:var(--rb-muted)">No phone</div>{% endif %}
+                    {% if lead.email %}<div style="color:var(--rb-muted);font-size:11px">{{ lead.email }}</div>{% endif %}
+                </td>
                 <td>{{ lead.get_lead_source_display }}</td>
                 <td><span class="rb-pill p-{{ lead.status }}">{{ lead.get_status_display }}</span></td>
                 <td><div style="display:flex;align-items:center;gap:7px"><div class="rb-mini-bar" style="width:46px"><i style="width:{{ lead.ai_score }}%"></i></div><b>{{ lead.ai_score }}</b></div></td>
                 <td>{{ lead.spo.name|default:"—" }}</td>
                 <td style="color:var(--rb-muted);white-space:nowrap">{{ lead.created_at|date:"M d, Y" }}</td>
                 <td class="rb-act" style="white-space:nowrap">
-                    <a href="tel:{{ lead.contact_number }}" title="Call">&#128222;</a>
+                    {% if lead.contact_number %}<a href="tel:{{ lead.contact_number }}" title="Call">&#128222;</a>{% endif %}
                     {% if lead.email %}<a href="{% url 'email_compose_lead' lead.pk %}" title="Email">&#9993;</a>{% endif %}
                     <a href="{% url 'lead_detail' lead.pk %}" title="View">&#128065;</a>
                     {% if request.user|has_full_access:'leads' %}<a href="{% url 'lead_delete' lead.pk %}" style="color:var(--rb-red)" title="Delete" onclick="return confirm('Delete this lead?');">&#128465;</a>{% endif %}
                 </td>
             </tr>
-            {% empty %}<tr><td colspan="8" class="rb-empty">No leads found. Try adjusting your filters.</td></tr>{% endfor %}
+            {% empty %}<tr><td colspan="10" class="rb-empty">No leads found. Try adjusting your filters.</td></tr>{% endfor %}
             </tbody>
         </table>
         </div>
+        </form>
 
         <div class="rb-pager">
             {% if page_obj.has_previous %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}">&lsaquo;</a>{% endif %}
@@ -73,7 +94,7 @@
     <div style="display:flex;flex-direction:column;gap:16px">
         <form method="get" class="rb-card">
             <h3>Lead Filters</h3>
-            <div class="rb-field"><label>Search</label><input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Name, phone or email"></div>
+            <div class="rb-field"><label>Search</label><input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Name, company, phone or email"></div>
             <div class="rb-field"><label>Source</label>
                 <select name="source"><option value="">All Sources</option>{% for v, l in lead_sources %}<option value="{{ v }}" {% if request.GET.source == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
             {% if not current_status %}
@@ -86,6 +107,13 @@
                 <select name="spo"><option value="">All Users</option>{% for s in spos %}<option value="{{ s.id }}" {% if request.GET.spo == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></div>
             <div class="rb-field"><label>Sort</label>
                 <select name="score"><option value="">Newest first</option><option value="high" {% if request.GET.score == 'high' %}selected{% endif %}>Highest AI Score</option><option value="low" {% if request.GET.score == 'low' %}selected{% endif %}>Lowest AI Score</option></select></div>
+            <div class="rb-field"><label>Leads per page</label>
+                <select name="per_page">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                </select></div>
             <div style="display:flex;gap:8px"><a class="rb-btn" style="flex:1;justify-content:center" href="{% if current_status %}{% url 'lead_status_list' current_status %}{% else %}{% url 'all_leads' %}{% endif %}">Reset</a><button class="rb-btn primary" style="flex:1;justify-content:center" type="submit">Apply</button></div>
         </form>
         <div class="rb-card rb-qa">
@@ -99,4 +127,43 @@
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+  var form = document.getElementById('bulkDeleteForm');
+  if (!form) return;
+  var all   = document.getElementById('selectAll');
+  var bar   = document.getElementById('bulkBar');
+  var count = document.getElementById('bulkCount');
+  var clear = document.getElementById('bulkClear');
+  var rows  = function () { return Array.prototype.slice.call(form.querySelectorAll('.row-check')); };
+
+  function refresh() {
+    var checked = rows().filter(function (c) { return c.checked; }).length;
+    if (count) count.textContent = checked;
+    if (bar) bar.style.display = checked ? 'flex' : 'none';
+    if (all) {
+      all.checked = checked > 0 && checked === rows().length;
+      all.indeterminate = checked > 0 && checked < rows().length;
+    }
+  }
+
+  if (all) all.addEventListener('change', function () {
+    rows().forEach(function (c) { c.checked = all.checked; });
+    refresh();
+  });
+  form.addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('row-check')) refresh();
+  });
+  if (clear) clear.addEventListener('click', function () {
+    rows().forEach(function (c) { c.checked = false; });
+    refresh();
+  });
+  form.addEventListener('submit', function (e) {
+    var n = rows().filter(function (c) { return c.checked; }).length;
+    if (!n || !confirm('Delete ' + n + ' selected lead(s)? This cannot be undone.')) e.preventDefault();
+  });
+  refresh();
+})();
+</script>
 {% endblock %}

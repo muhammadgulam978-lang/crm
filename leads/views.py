@@ -285,6 +285,8 @@ def _send_whatsapp_welcome(lead):
     Sends WhatsApp welcome message to a newly created lead.
     Never raises — failure is logged but does not break lead creation.
     """
+    if not (lead.contact_number or '').strip():
+        return   # phone nahi hai to WhatsApp message nahi bhej sakte
     try:
         from chatbot.services.whatsapp import send_welcome_message
         from chatbot.models import ChatSession, ChatMessage
@@ -560,103 +562,155 @@ def ai_assign_lead(request, pk):
         messages.error(request, 'AI assignment failed. No salespersons available.')
     return redirect('lead_detail', pk=pk)
 
+# =====================================================================
+# leads/views.py  —  in cheezon ko replace / add karo
+def _cell(normalized, *keys):
+    """
+    Diye gaye keys mein se pehli non-empty value string mein return karta hai.
+    None / 'None' / 'nan' ko '' bana deta hai (Excel ke blank cells ka masla).
+    Excel numbers jaise 3.0 ko '3' bana deta hai.
+    """
+    for k in keys:
+        v = normalized.get(k)
+        if v is None:
+            continue
+        if isinstance(v, float) and v.is_integer():
+            v = int(v)
+        s = str(v).strip()
+        if s and s.lower() not in ('none', 'nan', 'null'):
+            return s
+    return ''
+
 
 @login_required
 @block_view_only
 def bulk_import_leads(request):
-    if request.method == 'POST':
-        file = request.FILES.get('import_file')
-        if not file:
-            messages.error(request, 'Please select a CSV or Excel file.')
-            return redirect('create_lead')
+    if request.method != 'POST':
+        return redirect('create_lead')
 
-        filename = file.name.lower()
-        rows = []
+    file = request.FILES.get('import_file')
+    if not file:
+        messages.error(request, 'Please select a CSV or Excel file.')
+        return redirect('create_lead')
+
+    filename = file.name.lower()
+    rows = []
+
+    try:
+        if filename.endswith('.csv'):
+            decoded = file.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(decoded))
+            rows = list(reader)
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            wb = openpyxl.load_workbook(file, data_only=True)
+            ws = wb.active
+            headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                rows.append(dict(zip(headers, row)))
+        else:
+            messages.error(request, 'Unsupported file type. Please upload a .csv or .xlsx file.')
+            return redirect('create_lead')
+    except Exception as e:
+        messages.error(request, f'Could not read the file: {e}')
+        return redirect('create_lead')
+
+    spo = request.user.salesperson if hasattr(request.user, 'salesperson') else None
+
+    created_count = 0
+    skipped_count = 0
+    errors = []
+
+    for i, row in enumerate(rows, start=2):
+        # header normalize: "Company" -> "company", "Contact Number" -> "contact_number"
+        normalized = {
+            str(k).strip().lower().replace(' ', '_'): v
+            for k, v in row.items() if k
+        }
+
+        name = _cell(normalized, 'name', 'full_name', 'contact_name')
+        company_name = _cell(normalized, 'company', 'company_name', 'organization', 'organisation')
+        contact_number = _cell(normalized, 'contact_number', 'phone', 'contact', 'mobile', 'number')
+        email = _cell(normalized, 'email')
+        city = _cell(normalized, 'city')
+        country = _cell(normalized, 'country')
+        address = _cell(normalized, 'address')
+        detail = _cell(normalized, 'detail', 'notes')
 
         try:
-            if filename.endswith('.csv'):
-                decoded = file.read().decode('utf-8-sig')
-                reader = csv.DictReader(io.StringIO(decoded))
-                rows = list(reader)
-            elif filename.endswith('.xlsx') or filename.endswith('.xls'):
-                wb = openpyxl.load_workbook(file, data_only=True)
-                ws = wb.active
-                headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
-                for row in ws.iter_rows(min_row=2, values_only=True):
-                    row_dict = dict(zip(headers, row))
-                    rows.append(row_dict)
-            else:
-                messages.error(request, 'Unsupported file type. Please upload a .csv or .xlsx file.')
-                return redirect('create_lead')
-        except Exception as e:
-            messages.error(request, f'Could not read the file: {e}')
-            return redirect('create_lead')
+            quotation = Decimal(_cell(normalized, 'quotation') or 0)
+        except InvalidOperation:
+            quotation = Decimal(0)
 
-        valid_sources = dict(LEAD_SOURCE_CHOICES)
-        spo = request.user.salesperson if hasattr(request.user, 'salesperson') else None
+        source_raw = _cell(normalized, 'lead_source', 'source').lower()
+        lead_source = 'advertisement'
+        for key, label in LEAD_SOURCE_CHOICES:
+            if source_raw == key or source_raw == label.lower():
+                lead_source = key
+                break
 
-        created_count = 0
-        skipped_count = 0
-        errors = []
+        # Phone ab OPTIONAL hai. Sirf wahi row skip hogi jisme name aur company
+        # dono khali hon (yani poori row khali / kharab ho).
+        if not name and not company_name:
+            skipped_count += 1
+            errors.append(f'Row {i}: name aur company dono khali hain, skipped.')
+            continue
+        if not name:
+            name = company_name   # contact ka naam nahi hai to company ka naam use karo
 
-        for i, row in enumerate(rows, start=2):
-            # normalize keys to lowercase, no spaces, for flexible header matching
-            normalized = {
-                str(k).strip().lower().replace(' ', '_'): v
-                for k, v in row.items() if k
-            }
+        try:
+            lead = Lead.objects.create(
+                name=name,
+                company_name=company_name or None,
+                contact_number=contact_number,        # blank ho sakta hai ('')
+                email=email or None,
+                city=city or None,
+                country=country or None,
+                address=address or None,
+                detail=detail or None,
+                quotation=quotation,
+                lead_source=lead_source,
+                spo=spo,
+            )
 
-            name = str(normalized.get('name', '')).strip()
-            contact_number = str(normalized.get('contact_number')
-                                  or normalized.get('phone')
-                                  or normalized.get('contact') or '').strip()
-            email = str(normalized.get('email', '')).strip()
-            city = str(normalized.get('city', '')).strip()
-            country = str(normalized.get('country', '')).strip()
-            address = str(normalized.get('address', '')).strip()
-            detail = str(normalized.get('detail') or normalized.get('notes') or '').strip()
-            quotation = normalized.get('quotation') or 0
-
-            source_raw = str(normalized.get('lead_source') or normalized.get('source') or '').strip().lower()
-            lead_source = 'advertisement'
-            for key, label in LEAD_SOURCE_CHOICES:
-                if source_raw == key or source_raw == label.lower():
-                    lead_source = key
-                    break
-
-            if not name or not contact_number:
-                skipped_count += 1
-                errors.append(f'Row {i}: missing name or contact number, skipped.')
-                continue
-
-            try:
-                lead = Lead.objects.create(
-                    name=name,
-                    contact_number=contact_number,
-                    email=email or None,
-                    city=city or None,
-                    country=country or None,
-                    address=address or None,
-                    detail=detail or None,
-                    quotation=quotation or 0,
-                    lead_source=lead_source,
-                    spo=spo,
-                )
+            if contact_number:
                 check_and_mark_duplicate(lead)
                 _send_whatsapp_welcome(lead)
-                created_count += 1
-            except Exception as e:
-                skipped_count += 1
-                errors.append(f'Row {i}: {e}')
+            elif email:
+                # phone nahi hai to duplicate check email se
+                original = (Lead.objects.filter(email__iexact=email)
+                            .exclude(pk=lead.pk).order_by('created_at').first())
+                if original:
+                    lead.is_duplicate = True
+                    lead.duplicate_of = original
+                    lead.save(update_fields=['is_duplicate', 'duplicate_of'])
 
-        if created_count:
-            messages.success(request, f'{created_count} leads imported successfully.')
-        if skipped_count:
-            messages.error(request, f'{skipped_count} rows skipped. ' + ' '.join(errors[:5]))
+            created_count += 1
+        except Exception as e:
+            skipped_count += 1
+            errors.append(f'Row {i}: {e}')
 
-        return redirect('all_leads')
+    if created_count:
+        messages.success(request, f'{created_count} leads imported successfully.')
+    if skipped_count:
+        messages.error(request, f'{skipped_count} rows skipped. ' + ' '.join(errors[:5]))
 
-    return redirect('create_lead')
+    return redirect('all_leads')
+
+
+@login_required
+@block_view_only
+@require_POST
+def bulk_delete_leads(request):
+    """Selected leads ko ek saath delete karta hai (checkbox name = lead_ids)."""
+    ids = [i for i in request.POST.getlist('lead_ids') if i.isdigit()]
+    if not ids:
+        messages.error(request, 'Koi lead select nahi ki gayi.')
+        return redirect(request.META.get('HTTP_REFERER', 'all_leads'))
+
+    deleted_count = Lead.objects.filter(pk__in=ids).count()
+    Lead.objects.filter(pk__in=ids).delete()
+    messages.success(request, f'{deleted_count} leads deleted successfully.')
+    return redirect('all_leads')
 
 
 @login_required
@@ -673,7 +727,7 @@ def lead_list(request, status=None):
 
     q = request.GET.get('q')
     if q:
-        leads = leads.filter(Q(name__icontains=q) | Q(contact_number__icontains=q) | Q(email__icontains=q))
+        leads = leads.filter(Q(name__icontains=q) | Q(company_name__icontains=q) | Q(contact_number__icontains=q) | Q(email__icontains=q))
 
     source = request.GET.get('source')
     spo = request.GET.get('spo')
@@ -699,7 +753,14 @@ def lead_list(request, status=None):
     else:
         leads = leads.order_by('-created_at')
 
-    paginator = Paginator(leads, 10)
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (TypeError, ValueError):
+        per_page = 10
+    if per_page not in (10, 25, 50, 100):
+        per_page = 10
+
+    paginator = Paginator(leads, per_page)
     page_obj = paginator.get_page(request.GET.get('page'))
     qs = request.GET.copy()
     qs.pop('page', None)
@@ -716,6 +777,7 @@ def lead_list(request, status=None):
         'lead_statuses': Lead._meta.get_field('status').choices,
         'spos': SalesPerson.objects.all(),
         'current_status': status or '',
+        'per_page': per_page,
         'range_label': timezone.localdate().strftime('%b %d, %Y'),
     }
     return render(request, 'leads/lead_list.html', context)

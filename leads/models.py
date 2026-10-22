@@ -126,7 +126,8 @@ LEAD_STATUS_CHOICES = [
 class Lead(models.Model):
     lead_source    = models.CharField(max_length=30, choices=LEAD_SOURCE_CHOICES, default='advertisement')
     name           = models.CharField(max_length=150)
-    contact_number = models.CharField(max_length=30)
+    company_name   = models.CharField(max_length=200, blank=True, null=True)
+    contact_number = models.CharField(max_length=30, blank=True, default='')
     email          = models.EmailField(blank=True, null=True)
     country        = models.CharField(max_length=100, blank=True, null=True)
     city           = models.CharField(max_length=100, blank=True, null=True)

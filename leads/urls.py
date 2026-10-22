@@ -142,6 +142,7 @@ urlpatterns = [
     path('notifications/<int:pk>/delete/', views.notification_delete, name='notification_delete'),
 
     path('leads/bulk-import/', views.bulk_import_leads, name='bulk_import_leads'),
+    path('leads/bulk-delete/', views.bulk_delete_leads, name='bulk_delete_leads'),
     path('whatsapp/bulk/', views.bulk_whatsapp_sender, name='bulk_whatsapp_sender'),
     path('emails/bulk-send/', views.bulk_email_sender, name='bulk_email_sender'),
 
